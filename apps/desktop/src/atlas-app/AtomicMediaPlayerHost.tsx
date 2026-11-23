@@ -13,6 +13,11 @@ import { ElasticMotionBar } from "./ElasticMotionBar";
 import { getMessages, type AppLocale } from "./i18n";
 import type { LibraryItem } from "./library-engine";
 import { formatAudioTime } from "./media-helpers";
+import {
+  buildVideoCssFilter,
+  buildVideoPreviewTransform,
+  hasNonDestructiveEdits,
+} from "./video-editor-engine";
 
 export interface AtomicVideoPlaybackState {
   itemId: string;
@@ -446,16 +451,19 @@ export interface VideoQuickLookStageProps {
   item: LibraryItem;
   locale: AppLocale;
   onPinToPip: (item: LibraryItem) => void;
+  onEnterEdit?: (item: LibraryItem) => void;
 }
 
 /**
  * QuickLook Video Stage backed by `AtomicVideoSlot` (`moveBefore`) + tactile
- * `#F2901B` ElasticMotionBar timeline + seamless Picture-in-Picture pop-out.
+ * `#F2901B` ElasticMotionBar timeline + seamless Picture-in-Picture pop-out +
+ * non-destructive Video Studio entry.
  */
 export function VideoQuickLookStage({
   item,
   locale,
   onPinToPip,
+  onEnterEdit,
 }: VideoQuickLookStageProps) {
   const m = getMessages(locale);
   useAtomicMediaVersion();
@@ -468,14 +476,31 @@ export function VideoQuickLookStage({
   const playing = snap?.playing ?? true;
   const elapsed = snap?.elapsed ?? 0;
   const duration = snap?.duration ?? parseDurationToSeconds(item.duration);
+  const isEdited = hasNonDestructiveEdits(item.videoEdit, item);
+  const savedFilter = item.videoEdit
+    ? buildVideoCssFilter(item.videoEdit.grade)
+    : "none";
+  const savedTransform = item.videoEdit
+    ? buildVideoPreviewTransform(item.videoEdit.transform)
+    : "none";
 
   return (
     <div
       className="ql-video-stage"
       data-testid="ql-video-stage"
+      data-video-edited={isEdited ? "true" : "false"}
       onClick={(e) => e.stopPropagation()}
     >
-      <AtomicVideoSlot item={item} slotKind="quicklook" autoActivate />
+      <div
+        className="ql-video-media-wrap"
+        data-testid="ql-video-media-wrap"
+        style={{
+          filter: savedFilter,
+          transform: savedTransform,
+        }}
+      >
+        <AtomicVideoSlot item={item} slotKind="quicklook" autoActivate />
+      </div>
 
       <div className="ql-video-controls-bar">
         <button
@@ -520,6 +545,35 @@ export function VideoQuickLookStage({
         <span className="ql-video-time ql-video-time--dim">
           {formatAudioTime(duration)}
         </span>
+
+        {onEnterEdit && (
+          <button
+            type="button"
+            className={`ql-video-edit-btn ${isEdited ? "ql-video-edit-btn--edited" : ""}`}
+            data-testid="ql-video-edit-btn"
+            title={m.videoEditBtn}
+            aria-label={m.videoEditBtn}
+            onClick={() => onEnterEdit(item)}
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M2.5 5h11M2.5 11h11" />
+              <circle cx="6" cy="5" r="1.8" fill="currentColor" stroke="none" />
+              <circle cx="10.5" cy="11" r="1.8" fill="currentColor" stroke="none" />
+            </svg>
+            <span>{m.videoEditBtn}</span>
+            {isEdited && <span className="ql-video-edited-dot" aria-hidden="true" />}
+          </button>
+        )}
 
         <button
           type="button"

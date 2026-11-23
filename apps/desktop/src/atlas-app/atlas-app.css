@@ -1869,6 +1869,24 @@ textarea {
   z-index: 2;
 }
 
+.hero-slide-slot {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  will-change: transform, opacity;
+}
+
+.dock-counter {
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  padding: 0 7px;
+  user-select: none;
+  white-space: nowrap;
+}
+
 .lightbox-hero-img {
   width: 100%;
   height: 100%;
@@ -4435,6 +4453,28 @@ textarea {
   .lightbox-inspector {
     display: none;
   }
+  .lightbox-topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .lightbox-topbar .mac-dots {
+    display: none;
+  }
+  .lightbox-file-meta {
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+  }
+  .lightbox-sub {
+    display: none;
+  }
+  .ql-topbar-edit-pill {
+    height: 32px;
+    padding: 0 11px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
   .settings-window {
     flex-direction: column;
     height: calc(100vh - 32px);
@@ -5884,6 +5924,3267 @@ button.card-video-badge--live:hover {
   color: var(--ink-2);
   min-width: 30px;
   text-align: right;
+}
+
+/* ============================================================================
+   QUICKLOOK VIDEO EDIT ENTRY & NON-DESTRUCTIVE LIVE PREVIEW WRAPPER
+   ============================================================================ */
+
+.ql-video-media-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: filter 160ms ease, transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: center center;
+}
+
+.ql-video-edit-btn,
+.ql-topbar-edit-pill {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.92);
+  color: #1c1c1e;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.ql-video-edit-btn:hover,
+.ql-topbar-edit-pill:hover {
+  background: #ffffff;
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #1d4ed8;
+  transform: translateY(-0.5px);
+}
+
+.ql-video-edit-btn--edited,
+.ql-topbar-edit-pill--edited {
+  border-color: rgba(59, 130, 246, 0.42);
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
+}
+
+[data-atlas-theme="dark"] .ql-video-edit-btn,
+[data-atlas-theme="dark"] .ql-topbar-edit-pill {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f5f5f7;
+  box-shadow: none;
+}
+
+[data-atlas-theme="dark"] .ql-video-edit-btn:hover,
+[data-atlas-theme="dark"] .ql-topbar-edit-pill:hover {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(96, 165, 250, 0.55);
+  color: #93c5fd;
+}
+
+[data-atlas-theme="dark"] .ql-video-edit-btn--edited,
+[data-atlas-theme="dark"] .ql-topbar-edit-pill--edited {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(96, 165, 250, 0.52);
+  color: #93c5fd;
+}
+
+.ql-video-edited-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.22);
+  flex-shrink: 0;
+}
+
+.rich-video-edited-dot {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 4;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #3b82f6;
+  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.28);
+  pointer-events: none;
+}
+
+/* ============================================================================
+   NON-DESTRUCTIVE VIDEO EDITOR STUDIO (1:1 REFERENCE SUITE)
+   ============================================================================ */
+
+.ve-studio-root {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  width: 100vw;
+  width: 100%;
+  overflow: hidden;
+  user-select: none;
+  background: var(--bg-canvas, #ffffff);
+  color: var(--ink-1, rgba(17, 17, 17, 0.92));
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+    "Plus Jakarta Sans", "Helvetica Neue", sans-serif;
+}
+
+[data-atlas-theme="dark"] .ve-studio-root {
+  background: var(--bg-canvas, #1c1c1e);
+  color: var(--ink-1, rgba(255, 255, 255, 0.94));
+}
+
+.ve-ambient-backdrop {
+  position: absolute;
+  inset: -48px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(64px) saturate(1.12) brightness(1.08);
+  opacity: 0.22;
+  transform: scale(1.12);
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-atlas-theme="dark"] .ve-ambient-backdrop {
+  opacity: 0.2;
+  filter: blur(68px) saturate(1.18) brightness(0.62);
+}
+
+.ve-ambient-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 249, 251, 0.88) 0%,
+    rgba(245, 246, 249, 0.78) 54%,
+    rgba(255, 255, 255, 0.94) 100%
+  );
+  backdrop-filter: blur(26px);
+  -webkit-backdrop-filter: blur(26px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-atlas-theme="dark"] .ve-ambient-veil {
+  background: linear-gradient(
+    180deg,
+    rgba(28, 28, 30, 0.86) 0%,
+    rgba(24, 24, 27, 0.78) 54%,
+    rgba(22, 22, 25, 0.94) 100%
+  );
+}
+
+/* ── Studio Topbar (Unified Atlas Web-Software Aesthetic) ─────────────────── */
+
+.ve-topbar {
+  position: relative;
+  z-index: 3;
+  height: 56px;
+  padding: 0 18px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-1);
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+[data-atlas-theme="dark"] .ve-topbar {
+  background: rgba(28, 28, 30, 0.72);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.ve-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ve-title-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.ve-filename {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ve-submeta {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Centered Segmented Pill matching Atlas .view-segmented */
+.ve-center-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9999px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.ve-center-tab {
+  position: relative;
+  height: 28px;
+  padding: 0 15px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.ve-center-tab:hover {
+  color: var(--ink-1);
+}
+
+.ve-center-tab--active {
+  color: var(--ink-1);
+}
+
+.ve-tab-pill-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--pill-thumb);
+  box-shadow: var(--pill-thumb-shadow);
+  z-index: 0;
+}
+
+.ve-center-tab-label {
+  position: relative;
+  z-index: 1;
+}
+
+.ve-topbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ve-ghost-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-glass);
+  color: var(--ink-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: background-color 130ms ease, opacity 130ms ease, transform 130ms ease;
+}
+
+.ve-ghost-btn:hover:not(:disabled) {
+  background: var(--bg-glass-strong);
+}
+
+.ve-ghost-btn:disabled {
+  opacity: 0.36;
+  cursor: default;
+}
+
+.ve-text-btn {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-glass);
+  color: var(--ink-1);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition: background-color 130ms ease, color 130ms ease, border-color 130ms ease;
+}
+
+.ve-text-btn:hover:not(:disabled) {
+  background: var(--bg-glass-strong);
+}
+
+.ve-text-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.ve-text-btn--active {
+  background: #18181b;
+  border-color: #18181b;
+  color: #ffffff;
+}
+
+[data-atlas-theme="dark"] .ve-text-btn--active {
+  background: #f4f4f5;
+  color: #111113;
+  border-color: #f4f4f5;
+}
+
+.ve-primary-btn {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  border: 1px solid rgba(24, 24, 27, 0.92);
+  background: #18181b;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.14);
+  transition: transform 130ms ease, background-color 130ms ease;
+}
+
+.ve-primary-btn:hover {
+  background: #27272a;
+  transform: translateY(-0.5px);
+}
+
+[data-atlas-theme="dark"] .ve-primary-btn {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #111113;
+}
+
+[data-atlas-theme="dark"] .ve-primary-btn:hover {
+  background: #e4e4e7;
+}
+
+/* ── Upper 3-Column Studio Stage + Middle Media Bin ──────────────────────── */
+
+.ve-stage-section {
+  position: relative;
+  z-index: 2;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 24px 10px;
+  gap: 10px;
+}
+
+.ve-stage-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 1380px;
+  margin: 0 auto;
+}
+
+/* Left Floating 7-Button Vertical Porcelain Tool Rail (Cohesive with Atlas Canvas Dock) */
+.ve-left-rail {
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border-radius: 9999px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.ve-rail-btn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.ve-rail-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink-1);
+  transform: scale(1.04);
+}
+
+.ve-rail-btn--active {
+  background: #18181b;
+  border-color: rgba(24, 24, 27, 0.9);
+  color: #ffffff;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.16);
+}
+
+.ve-rail-btn--active:hover {
+  background: #27272a;
+  color: #ffffff;
+}
+
+[data-atlas-theme="dark"] .ve-rail-btn {
+  color: rgba(244, 244, 245, 0.72);
+}
+
+[data-atlas-theme="dark"] .ve-rail-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+[data-atlas-theme="dark"] .ve-rail-btn--active {
+  background: #ffffff;
+  color: #111113;
+  border-color: #ffffff;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+}
+
+.ve-rail-btn--ring {
+  width: 34px;
+  height: 34px;
+}
+
+.ve-ring-svg {
+  position: absolute;
+  inset: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+}
+
+.ve-ring-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Center Rounded Video Preview Frame */
+.ve-preview-column {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ve-preview-frame {
+  position: relative;
+  height: 100%;
+  max-height: 344px;
+  max-width: min(640px, 48vw);
+  width: auto;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #101114;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.22),
+    0 4px 16px rgba(15, 23, 42, 0.12);
+}
+
+[data-atlas-theme="dark"] .ve-preview-frame {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 28px 64px rgba(0, 0, 0, 0.56),
+    0 4px 16px rgba(0, 0, 0, 0.34);
+}
+
+.ve-preview-media-layer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: center center;
+  transition: opacity 90ms linear;
+}
+
+.ve-broll-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ve-crop-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.ve-crop-line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.ve-crop-line--v1 {
+  top: 0;
+  bottom: 0;
+  left: 33.333%;
+  width: 1px;
+}
+
+.ve-crop-line--v2 {
+  top: 0;
+  bottom: 0;
+  left: 66.666%;
+  width: 1px;
+}
+
+.ve-crop-line--h1 {
+  left: 0;
+  right: 0;
+  top: 33.333%;
+  height: 1px;
+}
+
+.ve-crop-line--h2 {
+  left: 0;
+  right: 0;
+  top: 66.666%;
+  height: 1px;
+}
+
+.ve-compare-flag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 6;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(16, 17, 20, 0.72);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  backdrop-filter: blur(12px);
+}
+
+.ve-crop-pill-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 10px;
+  background: rgba(16, 17, 20, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+}
+
+.ve-crop-option {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ve-crop-option--active {
+  background: #ffffff;
+  color: #111113;
+}
+
+/* In-Frame Bottom Glass Scrubber (1:1 Reference Image 1) */
+.ve-inframe-scrubber {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  z-index: 5;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: rgba(22, 24, 28, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ve-inframe-play {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.94);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ve-inframe-play:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.ve-inframe-time {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.92);
+  min-width: 32px;
+  text-align: center;
+}
+
+.ve-inframe-time--dim {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.ve-inframe-track {
+  position: relative;
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  cursor: ew-resize;
+  overflow: hidden;
+}
+
+.ve-inframe-track-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+/* Right Floating Atlas Porcelain Adjustment Panel */
+.ve-right-panel {
+  justify-self: start;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ve-right-panel--min {
+  width: auto;
+}
+
+.ve-panel-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ve-mobile-panel-heading {
+  display: none;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.ve-panel-top-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ve-mobile-reset-btn {
+  display: none;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-glass);
+  color: var(--ink-1);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ve-mobile-reset-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.ve-minimize-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 130ms ease, color 130ms ease;
+}
+
+.ve-minimize-btn:hover {
+  background: var(--bg-hover);
+  color: var(--ink-1);
+}
+
+.ve-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
+  border-radius: 16px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.ve-dual-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.ve-action-pill {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-1);
+  background: var(--bg-canvas);
+  color: var(--ink-1);
+  font-size: 11.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
+}
+
+.ve-action-pill:hover {
+  background: var(--bg-surface);
+  border-color: rgba(17, 17, 17, 0.14);
+}
+
+.ve-action-pill--active {
+  background: var(--accent-blue-soft);
+  border-color: rgba(0, 122, 255, 0.34);
+  color: var(--accent-blue);
+  box-shadow: none;
+}
+
+[data-atlas-theme="dark"] .ve-action-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f4f4f5;
+  box-shadow: none;
+}
+
+[data-atlas-theme="dark"] .ve-action-pill:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+[data-atlas-theme="dark"] .ve-action-pill--active {
+  background: rgba(10, 132, 255, 0.24);
+  border-color: rgba(10, 132, 255, 0.52);
+  color: #93c5fd;
+}
+
+.ve-hd-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: currentColor;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.ve-action-pill .ve-hd-glyph {
+  background: #1c1c1e;
+  color: #ffffff;
+}
+
+[data-atlas-theme="dark"] .ve-action-pill .ve-hd-glyph {
+  background: #f4f4f5;
+  color: #111113;
+}
+
+/* Signature Tactile Full-Width Pill Sliders (Refined Porcelain Atlas Edition) */
+.ve-sliders-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ve-pill-slider {
+  position: relative;
+  height: 36px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(17, 17, 17, 0.055);
+  border: 1px solid rgba(17, 17, 17, 0.075);
+  cursor: ew-resize;
+  touch-action: none;
+  outline: none;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.ve-pill-slider:hover {
+  border-color: rgba(17, 17, 17, 0.14);
+}
+
+.ve-pill-slider:focus-visible {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px var(--accent-blue-soft);
+}
+
+[data-atlas-theme="dark"] .ve-pill-slider {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.ve-pill-slider-fill {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  bottom: 2px;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow:
+    0 1px 4px rgba(15, 23, 42, 0.09),
+    0 0 0 0.5px rgba(15, 23, 42, 0.05);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 5px;
+}
+
+[data-atlas-theme="dark"] .ve-pill-slider-fill {
+  background: rgba(255, 255, 255, 0.19);
+  box-shadow: none;
+}
+
+.ve-pill-slider-notch {
+  width: 2.5px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(24, 24, 27, 0.24);
+}
+
+[data-atlas-theme="dark"] .ve-pill-slider-notch {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.ve-pill-slider-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.ve-pill-slider-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-pill-slider-left {
+  color: #f4f4f5;
+}
+
+.ve-pill-slider-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+
+.ve-pill-slider-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ve-pill-slider-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ve-pill-slider-val {
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(24, 24, 27, 0.64);
+}
+
+[data-atlas-theme="dark"] .ve-pill-slider-val {
+  color: rgba(244, 244, 245, 0.78);
+}
+
+.ve-kf-inline-btn {
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: rgba(24, 24, 27, 0.45);
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ve-kf-inline-btn--active {
+  color: #3b82f6;
+}
+
+[data-atlas-theme="dark"] .ve-kf-inline-btn {
+  color: rgba(244, 244, 245, 0.45);
+}
+
+[data-atlas-theme="dark"] .ve-kf-inline-btn--active {
+  color: #60a5fa;
+}
+
+.ve-kf-diamond-glyph {
+  font-size: 10px;
+  line-height: 1;
+}
+
+/* ── Middle Horizontal Filmstrip Media Bin Rail (1:1 Image 1) ─────────────── */
+
+.ve-media-bin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 12px 4px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+
+.ve-media-bin::-webkit-scrollbar {
+  display: none;
+}
+
+.ve-bin-thumb {
+  position: relative;
+  width: 48px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  padding: 0;
+  background: #18181b;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ve-bin-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ve-bin-thumb:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.ve-bin-thumb--active {
+  width: 54px;
+  height: 48px;
+  border-color: #ffffff;
+  box-shadow:
+    0 8px 20px rgba(15, 23, 42, 0.24),
+    0 0 0 1px rgba(15, 23, 42, 0.1);
+}
+
+.ve-bin-add-badge {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  background: rgba(16, 17, 20, 0.78);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 130ms ease;
+}
+
+.ve-bin-thumb:hover .ve-bin-add-badge {
+  opacity: 1;
+}
+
+/* ── Bottom Multi-Track Non-Destructive Timeline Dock (Floating Porcelain Studio) ── */
+
+.ve-timeline-dock {
+  position: relative;
+  z-index: 5;
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 318px;
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 26px 8px;
+  background: rgba(252, 252, 253, 0.96);
+  border-top: 1px solid rgba(15, 23, 42, 0.07);
+  box-shadow: 0 -10px 32px rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+}
+
+[data-atlas-theme="dark"] .ve-timeline-dock {
+  background: rgba(20, 21, 25, 0.96);
+  border-top-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.46);
+}
+
+/* Floating Popover Layer above Timeline Header Card */
+.ve-popover-anchor-bar {
+  position: relative;
+  height: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.ve-popover {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow:
+    0 18px 46px rgba(15, 23, 42, 0.16),
+    0 2px 8px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  padding: 12px;
+  color: #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-popover {
+  background: rgba(28, 30, 36, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 20px 52px rgba(0, 0, 0, 0.56),
+    0 2px 10px rgba(0, 0, 0, 0.34);
+  color: #f4f4f5;
+}
+
+.ve-curve-popover {
+  left: 0;
+  width: 248px;
+}
+
+.ve-presets-popover {
+  left: 36px;
+  width: 244px;
+}
+
+.ve-tc-popover {
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+}
+
+.ve-mobile-sheet-scrim {
+  display: none;
+}
+
+.ve-sheet-grabber {
+  display: none;
+}
+
+.ve-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ve-popover-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ve-popover-close-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  border: none;
+  background: var(--bg-hover);
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ve-popover-close-btn:hover {
+  background: var(--bg-active);
+  color: var(--ink-1);
+}
+
+.ve-popover-title {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-1);
+}
+
+.ve-curve-coords {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(24, 24, 27, 0.52);
+}
+
+[data-atlas-theme="dark"] .ve-curve-coords {
+  color: rgba(244, 244, 245, 0.52);
+}
+
+.ve-curve-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+
+.ve-curve-svg {
+  width: 100%;
+  height: 126px;
+  display: block;
+  overflow: visible;
+}
+
+.ve-curve-grid-box {
+  fill: rgba(244, 245, 248, 0.85);
+  stroke: rgba(15, 23, 42, 0.08);
+  stroke-width: 1;
+}
+
+[data-atlas-theme="dark"] .ve-curve-grid-box {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: rgba(255, 255, 255, 0.09);
+}
+
+.ve-curve-grid-line {
+  stroke: rgba(15, 23, 42, 0.06);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+}
+
+[data-atlas-theme="dark"] .ve-curve-grid-line {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.ve-curve-diagonal {
+  stroke: rgba(15, 23, 42, 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+[data-atlas-theme="dark"] .ve-curve-diagonal {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.ve-curve-tangent {
+  stroke: rgba(59, 130, 246, 0.55);
+  stroke-width: 1.25;
+}
+
+.ve-curve-path {
+  fill: none;
+  stroke: #18181b;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+[data-atlas-theme="dark"] .ve-curve-path {
+  stroke: #f4f4f5;
+}
+
+.ve-curve-live-dot {
+  fill: #3b82f6;
+  stroke: #ffffff;
+  stroke-width: 1.4;
+}
+
+.ve-curve-anchor {
+  fill: #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-curve-anchor {
+  fill: #f4f4f5;
+}
+
+.ve-curve-handle {
+  fill: #ffffff;
+  stroke: #3b82f6;
+  stroke-width: 2;
+  cursor: grab;
+}
+
+.ve-curve-handle:active {
+  cursor: grabbing;
+}
+
+.ve-curve-rail {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+[data-atlas-theme="dark"] .ve-curve-rail {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ve-curve-rail-dot {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 999px;
+  background: #3b82f6;
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.45);
+}
+
+.ve-curve-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ve-curve-preset-btn {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  background: rgba(244, 245, 248, 0.9);
+  color: #3f3f46;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.ve-curve-preset-btn:hover:not(.ve-curve-preset-btn--active) {
+  background: #e4e4e7;
+  color: #18181b;
+}
+
+.ve-curve-preset-btn.ve-curve-preset-btn--active {
+  background: #18181b;
+  border-color: #18181b;
+  color: #ffffff;
+}
+
+[data-atlas-theme="dark"] .ve-curve-preset-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #d4d4d8;
+}
+
+[data-atlas-theme="dark"] .ve-curve-preset-btn:hover:not(.ve-curve-preset-btn--active) {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+
+[data-atlas-theme="dark"] .ve-curve-preset-btn.ve-curve-preset-btn--active {
+  background: #f4f4f5;
+  border-color: #f4f4f5;
+  color: #111113;
+}
+
+.ve-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ve-preset-row {
+  height: 30px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #27272a;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ve-preset-row:hover {
+  background: rgba(15, 23, 42, 0.055);
+}
+
+.ve-preset-row--active {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.25);
+  color: #1d4ed8;
+}
+
+.ve-preset-row--danger {
+  color: #dc2626;
+}
+
+.ve-preset-row--danger:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+[data-atlas-theme="dark"] .ve-preset-row {
+  color: #e4e4e7;
+}
+
+[data-atlas-theme="dark"] .ve-preset-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-atlas-theme="dark"] .ve-preset-row--active {
+  background: rgba(59, 130, 246, 0.22);
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #bfdbfe;
+}
+
+.ve-preset-row-tag {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(24, 24, 27, 0.46);
+  font-variant-numeric: tabular-nums;
+}
+
+[data-atlas-theme="dark"] .ve-preset-row-tag {
+  color: rgba(244, 244, 245, 0.48);
+}
+
+.ve-popover-close-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Unified Floating Porcelain Timeline Header Card (1:1 Reference Image 4) ── */
+.ve-tl-header-card {
+  position: relative;
+  z-index: 8;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.09);
+  box-shadow:
+    0 6px 22px rgba(15, 23, 42, 0.065),
+    0 1px 3px rgba(15, 23, 42, 0.05);
+  flex-shrink: 0;
+}
+
+[data-atlas-theme="dark"] .ve-tl-header-card {
+  background: #1c1e24;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.ve-timeline-toolbar {
+  height: 44px;
+  padding: 0 14px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+[data-atlas-theme="dark"] .ve-timeline-toolbar {
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+.ve-tl-tools-left,
+.ve-tl-center,
+.ve-tl-tools-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ve-tl-center {
+  justify-content: center;
+  gap: 12px;
+}
+
+.ve-tl-tools-right {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ve-tl-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(15, 23, 42, 0.1);
+  margin: 0 4px;
+}
+
+[data-atlas-theme="dark"] .ve-tl-divider {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Crisp Borderless Monochrome Timeline Tool Buttons (1:1 Reference Image 4) */
+.ve-tl-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #18181b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 130ms ease, color 130ms ease, border-color 130ms ease, transform 110ms ease;
+}
+
+.ve-tl-icon-btn:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.ve-tl-icon-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.ve-tl-icon-btn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.ve-tl-icon-btn--active {
+  background: rgba(15, 23, 42, 0.075);
+  border-color: rgba(15, 23, 42, 0.1);
+  color: #111113;
+}
+
+.ve-tl-icon-btn--play {
+  width: 32px;
+  height: 30px;
+  color: #111113;
+}
+
+[data-atlas-theme="dark"] .ve-tl-icon-btn {
+  color: #e4e4e7;
+}
+
+[data-atlas-theme="dark"] .ve-tl-icon-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+[data-atlas-theme="dark"] .ve-tl-icon-btn--active {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+/* Timecode Switcher Button (00: muted + 03:262 bold + caret) */
+.ve-timecode-btn {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #18181b;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.ve-timecode-btn:hover,
+.ve-timecode-btn--open {
+  background: rgba(15, 23, 42, 0.055);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+[data-atlas-theme="dark"] .ve-timecode-btn {
+  color: #f4f4f5;
+}
+
+[data-atlas-theme="dark"] .ve-timecode-btn:hover,
+[data-atlas-theme="dark"] .ve-timecode-btn--open {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.ve-timecode {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.ve-timecode-prefix {
+  color: rgba(24, 24, 27, 0.42);
+  font-weight: 500;
+}
+
+.ve-timecode-main {
+  color: #18181b;
+  font-weight: 700;
+}
+
+[data-atlas-theme="dark"] .ve-timecode-prefix {
+  color: rgba(244, 244, 245, 0.44);
+}
+
+[data-atlas-theme="dark"] .ve-timecode-main {
+  color: #f4f4f5;
+}
+
+.ve-timecode-caret {
+  color: rgba(24, 24, 27, 0.44);
+}
+
+[data-atlas-theme="dark"] .ve-timecode-caret {
+  color: rgba(244, 244, 245, 0.48);
+}
+
+.ve-transport-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Start animating (monochrome target) → Stop animating (coral-rose pill) */
+.ve-animate-pill {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #18181b;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.ve-animate-pill:hover {
+  background: rgba(15, 23, 42, 0.055);
+}
+
+.ve-animate-pill--recording {
+  background: #feeceb;
+  border-color: rgba(229, 72, 61, 0.28);
+  color: #d93829;
+}
+
+.ve-animate-pill--recording:hover {
+  background: #fde2e0;
+}
+
+[data-atlas-theme="dark"] .ve-animate-pill {
+  color: #f4f4f5;
+}
+
+[data-atlas-theme="dark"] .ve-animate-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-atlas-theme="dark"] .ve-animate-pill--recording {
+  background: rgba(229, 72, 61, 0.22);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fca5a5;
+}
+
+.ve-target-glyph {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1.5px solid #18181b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.ve-target-dot {
+  width: 5.5px;
+  height: 5.5px;
+  border-radius: 999px;
+  background: #18181b;
+  transition: background-color 140ms ease;
+}
+
+[data-atlas-theme="dark"] .ve-target-glyph {
+  border-color: #f4f4f5;
+}
+
+[data-atlas-theme="dark"] .ve-target-dot {
+  background: #f4f4f5;
+}
+
+.ve-target-glyph--recording {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2.5px rgba(239, 68, 68, 0.18);
+}
+
+.ve-target-glyph--recording .ve-target-dot {
+  background: #ef4444;
+}
+
+/* Script Button */
+.ve-script-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 249, 251, 0.9);
+  color: #27272a;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: background-color 130ms ease, border-color 130ms ease, color 130ms ease;
+}
+
+.ve-script-btn:hover {
+  background: #f4f4f5;
+}
+
+.ve-script-btn--active {
+  background: rgba(59, 130, 246, 0.11);
+  border-color: rgba(59, 130, 246, 0.38);
+  color: #1d4ed8;
+}
+
+[data-atlas-theme="dark"] .ve-script-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e4e4e7;
+}
+
+[data-atlas-theme="dark"] .ve-script-btn--active {
+  background: rgba(59, 130, 246, 0.24);
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #93c5fd;
+}
+
+/* Ultra-Minimal Hairline Zoom Slider */
+.ve-tl-zoom-wrap {
+  display: inline-flex;
+  align-items: center;
+  width: 78px;
+}
+
+.ve-tl-zoom-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 1.5px;
+  border-radius: 999px;
+  background: rgba(24, 24, 27, 0.16);
+  cursor: pointer;
+  outline: none;
+}
+
+.ve-tl-zoom-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1.6px solid #18181b;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+}
+
+.ve-tl-zoom-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1.6px solid #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-tl-zoom-range {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+[data-atlas-theme="dark"] .ve-tl-zoom-range::-webkit-slider-thumb {
+  background: #1c1e24;
+  border-color: #f4f4f5;
+}
+
+/* Integrated Bottom Ruler Sub-Row inside Floating Header Card */
+.ve-header-ruler {
+  position: relative;
+  height: 26px;
+  border-radius: 0 0 11px 11px;
+  background: rgba(249, 250, 252, 0.72);
+  cursor: ew-resize;
+  overflow: visible;
+}
+
+[data-atlas-theme="dark"] .ve-header-ruler {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.ve-work-area-bar {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 5px;
+  background: rgba(15, 23, 42, 0.035);
+  pointer-events: none;
+}
+
+[data-atlas-theme="dark"] .ve-work-area-bar {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.ve-ruler-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.ve-ruler-tick--first {
+  transform: translateX(8px);
+}
+
+.ve-ruler-tick--last {
+  transform: translateX(calc(-100% - 8px));
+}
+
+.ve-ruler-label {
+  font-size: 10px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: rgba(24, 24, 27, 0.44);
+}
+
+[data-atlas-theme="dark"] .ve-ruler-label {
+  color: rgba(244, 244, 245, 0.46);
+}
+
+.ve-ruler-subtick {
+  position: absolute;
+  top: 50%;
+  width: 1px;
+  height: 5px;
+  transform: translate(-50%, -50%);
+  background: rgba(24, 24, 27, 0.22);
+  pointer-events: none;
+}
+
+[data-atlas-theme="dark"] .ve-ruler-subtick {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.ve-ruler-marker-pin {
+  position: absolute;
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  border-radius: 1.5px;
+  transform: rotate(45deg);
+  border: 1px solid #ffffff;
+  background: #3b82f6;
+  cursor: pointer;
+  z-index: 4;
+}
+
+/* Signature Pentagon / Home-Plate Playhead Cap (1:1 Reference Image 4) */
+.ve-playhead-cap-wrap {
+  position: absolute;
+  top: 10px;
+  transform: translateX(-50%);
+  z-index: 10;
+  cursor: ew-resize;
+  padding: 0 5px;
+}
+
+.ve-playhead-cap {
+  width: 11px;
+  height: 16px;
+  background: #18181b;
+  clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
+  border-radius: 2px 2px 0 0;
+  filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.24));
+}
+
+[data-atlas-theme="dark"] .ve-playhead-cap {
+  background: #f4f4f5;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
+}
+
+/* Script / Beat Marker Strip */
+.ve-script-strip {
+  overflow: hidden;
+  margin-top: 6px;
+  border-radius: 9px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.8);
+  flex-shrink: 0;
+}
+
+[data-atlas-theme="dark"] .ve-script-strip {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.ve-script-strip-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  overflow-x: auto;
+}
+
+.ve-marker-chip {
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  background: rgba(59, 130, 246, 0.08);
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+[data-atlas-theme="dark"] .ve-marker-chip {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(96, 165, 250, 0.36);
+  color: #bfdbfe;
+}
+
+.ve-marker-time {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.78;
+}
+
+.ve-marker-label {
+  white-space: nowrap;
+}
+
+.ve-marker-add-btn {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px dashed rgba(15, 23, 42, 0.2);
+  background: transparent;
+  color: #52525b;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+[data-atlas-theme="dark"] .ve-marker-add-btn {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #a1a1aa;
+}
+
+/* ── Scrollable Multi-Track Canvas with Subtle Beat Gridlines ─────────────── */
+
+.ve-timeline-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 0 8px;
+}
+
+.ve-timeline-canvas {
+  position: relative;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 6px;
+}
+
+.ve-gridlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ve-gridline-v {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(15, 23, 42, 0.04);
+}
+
+[data-atlas-theme="dark"] .ve-gridline-v {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.ve-lane-band {
+  position: relative;
+  z-index: 1;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.055);
+}
+
+.ve-lane-band:last-of-type {
+  border-bottom: none;
+}
+
+[data-atlas-theme="dark"] .ve-lane-band {
+  border-bottom-color: rgba(255, 255, 255, 0.055);
+}
+
+/* ── Lane 1 & 4: Warm Amber Audio Cards (1:1 Reference Image 4) ───────────── */
+
+.ve-amber-audio-card {
+  border-radius: 10px;
+  border: 1.5px solid #f59e0b;
+  background: #fff9eb;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.12);
+  transition: opacity 160ms ease, filter 160ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.ve-amber-audio-card--selected {
+  border-color: #d97706;
+  box-shadow:
+    0 4px 14px rgba(245, 158, 11, 0.24),
+    0 0 0 1px rgba(217, 119, 6, 0.2);
+}
+
+.ve-amber-audio-card--dim {
+  opacity: 0.5;
+  filter: saturate(0.8);
+}
+
+.ve-amber-audio-card--dim:hover {
+  opacity: 0.78;
+}
+
+[data-atlas-theme="dark"] .ve-amber-audio-card {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: none;
+}
+
+.ve-amber-audio-header {
+  height: 22px;
+  padding: 0 8px;
+  background: linear-gradient(180deg, #ffb422 0%, #f9a825 100%);
+  color: #451a03;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+[data-atlas-theme="dark"] .ve-amber-audio-header {
+  background: rgba(245, 158, 11, 0.32);
+  color: #fef3c7;
+}
+
+.ve-amber-audio-title-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ve-amber-chevron {
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.72;
+}
+
+.ve-amber-note {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.ve-amber-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ve-amber-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ve-amber-mini-btn {
+  width: 19px;
+  height: 19px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: #451a03;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.82;
+  transition: background-color 120ms ease, opacity 120ms ease;
+}
+
+.ve-amber-mini-btn:hover {
+  background: rgba(69, 26, 3, 0.12);
+  opacity: 1;
+}
+
+.ve-amber-mini-btn--dim {
+  opacity: 0.42;
+}
+
+.ve-amber-mini-btn--active {
+  background: rgba(69, 26, 3, 0.16);
+  opacity: 1;
+}
+
+[data-atlas-theme="dark"] .ve-amber-mini-btn {
+  color: #fef3c7;
+}
+
+[data-atlas-theme="dark"] .ve-amber-mini-btn:hover {
+  background: rgba(254, 243, 199, 0.14);
+}
+
+.ve-amber-wave-body {
+  height: 24px;
+  padding: 3px 8px;
+  display: flex;
+  align-items: center;
+}
+
+.ve-amber-audio-card--compact .ve-amber-wave-body {
+  height: 20px;
+}
+
+.ve-amber-wave-bars {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1.5px;
+  overflow: hidden;
+}
+
+.ve-amber-wave-bar {
+  flex: 1 1 1.5px;
+  min-width: 1.5px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.65);
+}
+
+[data-atlas-theme="dark"] .ve-amber-wave-bar {
+  background: rgba(251, 191, 36, 0.72);
+}
+
+/* ── Lane 2: Silver Frosted Vector Path Transform Card (1:1 Reference Image 4) ── */
+
+.ve-vector-card {
+  position: relative;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #eff1f5 0%, #e7eaef 100%);
+  border: 1px solid rgba(15, 23, 42, 0.13);
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  overflow: hidden;
+  transition: opacity 150ms ease;
+}
+
+.ve-vector-card--disabled {
+  opacity: 0.45;
+}
+
+[data-atlas-theme="dark"] .ve-vector-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.045) 100%);
+  border-color: rgba(255, 255, 255, 0.11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Tapered Top-Left Frosted Pill Tab */
+.ve-vector-tab {
+  height: 24px;
+  padding: 0 10px 0 6px;
+  border-radius: 9px 0 10px 0;
+  background: rgba(218, 222, 230, 0.78);
+  border-right: 1px solid rgba(15, 23, 42, 0.07);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  color: #18181b;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+[data-atlas-theme="dark"] .ve-vector-tab {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.09);
+  color: #f4f4f5;
+}
+
+.ve-vector-title {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ve-vector-meta {
+  height: 100%;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ve-vector-easing-chip {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  color: #3f3f46;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.ve-vector-easing-chip:hover {
+  background: #ffffff;
+  color: #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-vector-easing-chip {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e4e4e7;
+}
+
+.ve-look-summary {
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(24, 24, 27, 0.62);
+  white-space: nowrap;
+}
+
+[data-atlas-theme="dark"] .ve-look-summary {
+  color: rgba(244, 244, 245, 0.64);
+}
+
+/* ── Inline Diamond Keyframe Property Tracks (1:1 Reference Image 4) ──────── */
+
+.ve-keyframe-drawer {
+  overflow: hidden;
+}
+
+.ve-keyframe-drawer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 4px 4px;
+}
+
+.ve-kf-row {
+  position: relative;
+  height: 21px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: crosshair;
+  border-radius: 6px;
+  padding: 0 4px;
+  transition: background-color 120ms ease;
+}
+
+.ve-kf-row:hover {
+  background: rgba(15, 23, 42, 0.03);
+}
+
+[data-atlas-theme="dark"] .ve-kf-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.ve-kf-lead-diamond {
+  width: 7.5px;
+  height: 7.5px;
+  transform: rotate(45deg);
+  border-radius: 1px;
+  border: 1.3px solid #9ca3af;
+  background: #ffffff;
+  flex-shrink: 0;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.ve-kf-lead-diamond--solid {
+  background: #18181b;
+  border-color: #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-kf-lead-diamond {
+  background: #18191e;
+  border-color: #71717a;
+}
+
+[data-atlas-theme="dark"] .ve-kf-lead-diamond--solid {
+  background: #f4f4f5;
+  border-color: #f4f4f5;
+}
+
+.ve-kf-row-label {
+  width: 68px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #9ca3af;
+  transition: color 120ms ease;
+}
+
+.ve-kf-row--active .ve-kf-row-label {
+  color: #18181b;
+  font-weight: 600;
+}
+
+[data-atlas-theme="dark"] .ve-kf-row-label {
+  color: #71717a;
+}
+
+[data-atlas-theme="dark"] .ve-kf-row--active .ve-kf-row-label {
+  color: #f4f4f5;
+}
+
+.ve-kf-row-track {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  margin-right: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.ve-kf-row-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(15, 23, 42, 0.07);
+}
+
+[data-atlas-theme="dark"] .ve-kf-row-track::before {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ve-kf-connector {
+  position: absolute;
+  top: 50%;
+  height: 1.25px;
+  transform: translateY(-50%);
+  background: rgba(156, 163, 175, 0.6);
+  pointer-events: none;
+}
+
+.ve-kf-row--active .ve-kf-connector {
+  background: rgba(24, 24, 27, 0.48);
+}
+
+[data-atlas-theme="dark"] .ve-kf-connector {
+  background: rgba(161, 161, 170, 0.45);
+}
+
+[data-atlas-theme="dark"] .ve-kf-row--active .ve-kf-connector {
+  background: rgba(244, 244, 245, 0.56);
+}
+
+.ve-kf-diamond {
+  position: absolute;
+  top: 50%;
+  width: 8.5px;
+  height: 8.5px;
+  margin-left: -4.25px;
+  margin-top: -4.25px;
+  padding: 0;
+  transform: rotate(45deg);
+  border-radius: 1.2px;
+  border: 1.4px solid #71717a;
+  background: #ffffff;
+  cursor: grab;
+  z-index: 2;
+  transition: transform 110ms ease, background-color 110ms ease, border-color 110ms ease;
+}
+
+.ve-kf-row--active .ve-kf-diamond {
+  border-color: #18181b;
+}
+
+.ve-kf-diamond:hover {
+  transform: rotate(45deg) scale(1.24);
+  border-color: #3b82f6;
+}
+
+.ve-kf-diamond--solid {
+  background: #18181b;
+  border-color: #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-kf-diamond {
+  background: #1a1b20;
+  border-color: #a1a1aa;
+}
+
+[data-atlas-theme="dark"] .ve-kf-row--active .ve-kf-diamond {
+  border-color: #f4f4f5;
+}
+
+[data-atlas-theme="dark"] .ve-kf-diamond--solid {
+  background: #f4f4f5;
+  border-color: #f4f4f5;
+}
+
+/* ── Lane 3: Video Cutscene Filmstrip Track + Frosted Overlay Tab ─────────── */
+
+.ve-video-track-lane {
+  position: relative;
+  height: 54px;
+  width: 100%;
+}
+
+.ve-video-clip-shell {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1.5px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, opacity 160ms ease, filter 160ms ease;
+}
+
+[data-atlas-theme="dark"] .ve-video-clip-shell {
+  background: #23252b;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.ve-video-clip-shell--selected {
+  border: 2px solid #3b82f6;
+  box-shadow:
+    0 4px 14px rgba(59, 130, 246, 0.18),
+    0 0 0 1px rgba(59, 130, 246, 0.14);
+  z-index: 2;
+}
+
+.ve-clip--hidden {
+  opacity: 0.46;
+  filter: saturate(0.72) brightness(1.06);
+}
+
+.ve-trim-handle {
+  width: 13px;
+  flex-shrink: 0;
+  background: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.ve-trim-handle--left {
+  border-radius: 7px 0 0 7px;
+}
+
+.ve-trim-handle--right {
+  border-radius: 0 7px 7px 0;
+}
+
+.ve-trim-bar {
+  width: 2.5px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.ve-video-clip-inner {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.ve-video-clip-shell--selected .ve-video-clip-inner {
+  border-radius: 0;
+}
+
+/* Frosted Top-Left Pill Tab Overlay on Filmstrip (1:1 Reference Image 4) */
+.ve-clip-overlay-tab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  height: 23px;
+  max-width: min(310px, 84%);
+  padding: 0 8px 0 5px;
+  border-radius: 0 0 10px 0;
+  background: rgba(235, 238, 244, 0.92);
+  border-right: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #18181b;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+[data-atlas-theme="dark"] .ve-clip-overlay-tab {
+  background: rgba(30, 32, 38, 0.9);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4f4f5;
+}
+
+.ve-clip-chevron {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #52525b;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 160ms ease, background-color 120ms ease;
+}
+
+.ve-clip-chevron:hover {
+  background: rgba(15, 23, 42, 0.08);
+}
+
+.ve-clip-chevron--open {
+  transform: rotate(90deg);
+  color: #18181b;
+}
+
+[data-atlas-theme="dark"] .ve-clip-chevron {
+  color: #a1a1aa;
+}
+
+[data-atlas-theme="dark"] .ve-clip-chevron--open {
+  color: #ffffff;
+}
+
+.ve-clip-name {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #27272a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+[data-atlas-theme="dark"] .ve-clip-name {
+  color: #f4f4f5;
+}
+
+.ve-clip-speed-meta {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #1d4ed8;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-atlas-theme="dark"] .ve-clip-speed-meta {
+  background: rgba(59, 130, 246, 0.25);
+  color: #93c5fd;
+}
+
+.ve-clip-mini-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.ve-clip-mini-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: #52525b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.ve-clip-mini-btn:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: #18181b;
+}
+
+.ve-clip-mini-btn--active {
+  color: #2563eb;
+}
+
+.ve-clip-mini-btn--muted {
+  opacity: 0.48;
+}
+
+.ve-clip-mini-btn--danger {
+  color: #dc2626;
+}
+
+[data-atlas-theme="dark"] .ve-clip-mini-btn {
+  color: #a1a1aa;
+}
+
+[data-atlas-theme="dark"] .ve-clip-mini-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.ve-filmstrip-row {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  background: #141519;
+}
+
+.ve-filmstrip-frame {
+  flex: 1 1 0;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.ve-filmstrip-frame:last-child {
+  border-right: none;
+}
+
+.ve-cut-separator {
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.ve-cut-separator i {
+  display: block;
+  width: 1.5px;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(24, 24, 27, 0.28);
+}
+
+[data-atlas-theme="dark"] .ve-cut-separator i {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Continuous 1px Hairline Vertical Playhead Needle ─────────────────────── */
+
+.ve-playhead {
+  position: absolute;
+  top: -6px;
+  bottom: 0;
+  z-index: 6;
+  pointer-events: none;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.ve-playhead-stem {
+  width: 1px;
+  flex: 1;
+  background: rgba(24, 24, 27, 0.72);
+}
+
+[data-atlas-theme="dark"] .ve-playhead-stem {
+  background: rgba(244, 244, 245, 0.78);
+}
+
+.ve-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Mobile Thumb-Zone Bottom Mode Bar (Hidden on Desktop) ────────────────── */
+.ve-mobile-bottom-bar {
+  display: none;
+}
+
+/* ── Tablet Adaptation (769px – 1140px) ───────────────────────────────────── */
+@media (max-width: 1140px) {
+  .ve-topbar {
+    padding: 0 14px;
+    gap: 8px;
+  }
+  .ve-stage-section {
+    padding: 8px 16px 8px;
+  }
+  .ve-stage-grid {
+    gap: 14px;
+  }
+  .ve-right-panel {
+    width: 244px;
+  }
+  .ve-preview-frame {
+    max-width: min(560px, 44vw);
+  }
+  .ve-timeline-dock {
+    padding: 8px 16px 8px;
+  }
+  .ve-timeline-toolbar {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .ve-tl-zoom-wrap {
+    width: 58px;
+  }
+}
+
+/* ── Mobile Responsive Video Studio (<= 768px, optimized for 375px–430px) ─── */
+@media (max-width: 768px) {
+  .ve-studio-root {
+    height: 100dvh;
+    width: 100%;
+  }
+
+  /* Compact 2-Zone Mobile App Topbar (<= 50px, zero horizontal overflow) */
+  .ve-topbar {
+    height: 50px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ve-topbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 7px;
+  }
+
+  .ve-filename {
+    font-size: 12.5px;
+  }
+
+  .ve-submeta {
+    font-size: 10px;
+  }
+
+  .ve-center-nav {
+    display: none;
+  }
+
+  .ve-topbar-right {
+    flex-shrink: 0;
+    gap: 5px;
+  }
+
+  .ve-ghost-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .ve-reset-btn {
+    display: none;
+  }
+
+  .ve-compare-btn {
+    height: 32px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+
+  .ve-primary-btn {
+    height: 32px;
+    padding: 0 13px;
+    font-size: 11.5px;
+  }
+
+  /* Upper Preview Stage + Horizontal Quick Tools Ribbon */
+  .ve-stage-section {
+    padding: 8px 12px 6px;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .ve-studio-root[data-mobile-tab="studio"] .ve-stage-section {
+    flex: 0 0 auto;
+  }
+
+  .ve-studio-root[data-mobile-tab="color"] .ve-stage-section,
+  .ve-studio-root[data-mobile-tab="motion"] .ve-stage-section {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .ve-stage-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .ve-preview-column {
+    order: 1;
+    height: auto;
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  .ve-preview-frame {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 218px;
+    aspect-ratio: 16 / 9;
+    border-radius: 14px;
+  }
+
+  .ve-inframe-scrubber {
+    left: 10px;
+    right: 10px;
+    bottom: 8px;
+    height: 32px;
+    padding: 0 8px;
+  }
+
+  /* Transform Vertical Desktop Rail into Sleek Horizontal Mobile Ribbon */
+  .ve-left-rail {
+    order: 2;
+    justify-self: stretch;
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 14px;
+    overflow-x: auto;
+    flex-shrink: 0;
+    scrollbar-width: none;
+  }
+
+  .ve-left-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ve-rail-btn,
+  .ve-rail-btn--ring {
+    width: 38px;
+    height: 38px;
+  }
+
+  /* Right Inspector Panel -> Full-Width Scrollable Touch Sheet on Adjust & Motion Tabs */
+  .ve-right-panel {
+    order: 3;
+    width: 100%;
+    justify-self: stretch;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 4px;
+  }
+
+  .ve-studio-root[data-mobile-tab="studio"] .ve-right-panel {
+    display: none;
+  }
+
+  .ve-studio-root[data-mobile-tab="studio"] .ve-media-bin,
+  .ve-studio-root[data-mobile-tab="motion"] .ve-media-bin {
+    display: none;
+  }
+
+  .ve-studio-root[data-mobile-tab="color"] .ve-media-bin {
+    justify-content: flex-start;
+    padding: 4px 2px 6px;
+    gap: 8px;
+  }
+
+  .ve-panel-top-row {
+    justify-content: space-between;
+    padding: 0 2px;
+  }
+
+  .ve-mobile-panel-heading {
+    display: inline-block;
+  }
+
+  .ve-mobile-reset-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ve-minimize-btn {
+    display: none;
+  }
+
+  .ve-panel-body {
+    padding: 12px;
+    border-radius: 16px;
+    gap: 10px;
+  }
+
+  .ve-action-pill {
+    height: 42px;
+    font-size: 12px;
+    border-radius: 11px;
+  }
+
+  .ve-pill-slider {
+    height: 42px;
+    border-radius: 11px;
+  }
+
+  .ve-pill-slider-label {
+    font-size: 12.5px;
+  }
+
+  .ve-pill-slider-val {
+    font-size: 12px;
+  }
+
+  .ve-kf-inline-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  /* Bottom Multi-Track Timeline Dock on Studio Tab */
+  .ve-timeline-dock {
+    position: relative;
+    z-index: 30;
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    padding: 8px 12px 6px;
+    border-top: 1px solid var(--border-1);
+    box-shadow: none;
+  }
+
+  /* Hide timeline chrome on Adjust/Motion tabs while preserving fixed popover bottom sheets */
+  .ve-studio-root[data-mobile-tab="color"] .ve-timeline-dock,
+  .ve-studio-root[data-mobile-tab="motion"] .ve-timeline-dock {
+    z-index: 30;
+    flex: 0 0 0;
+    height: 0;
+    min-height: 0;
+    padding: 0;
+    border: none;
+    overflow: visible;
+    background: transparent;
+  }
+
+  .ve-studio-root[data-mobile-tab="color"] .ve-tl-header-card,
+  .ve-studio-root[data-mobile-tab="color"] .ve-script-strip,
+  .ve-studio-root[data-mobile-tab="color"] .ve-timeline-scroll,
+  .ve-studio-root[data-mobile-tab="motion"] .ve-tl-header-card,
+  .ve-studio-root[data-mobile-tab="motion"] .ve-script-strip,
+  .ve-studio-root[data-mobile-tab="motion"] .ve-timeline-scroll {
+    display: none;
+  }
+
+  /* Responsive 2-Row Timeline Header Card on Mobile */
+  .ve-tl-header-card {
+    border-radius: 12px;
+  }
+
+  .ve-timeline-toolbar {
+    height: auto;
+    padding: 6px 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  /* Row 1: Primary Transport + Timecode + Animate Toggle */
+  .ve-tl-center {
+    order: 1;
+    width: 100%;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .ve-timecode-btn {
+    height: 34px;
+    padding: 0 6px;
+  }
+
+  .ve-timecode {
+    font-size: 12px;
+  }
+
+  .ve-tl-icon-btn {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+  }
+
+  .ve-tl-icon-btn--play {
+    width: 36px;
+    height: 34px;
+  }
+
+  .ve-animate-pill {
+    height: 32px;
+    padding: 0 9px;
+    font-size: 11px;
+    gap: 5px;
+    white-space: nowrap;
+  }
+
+  /* Row 2: Scrollable Edit Tools + Script + Snap */
+  .ve-tl-tools-left {
+    order: 2;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    gap: 2px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border-1);
+    scrollbar-width: none;
+  }
+
+  .ve-tl-tools-left::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ve-tl-tools-right {
+    order: 3;
+    flex-shrink: 0;
+    gap: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border-1);
+  }
+
+  .ve-tl-zoom-wrap {
+    display: none;
+  }
+
+  .ve-script-btn {
+    height: 32px;
+    padding: 0 8px;
+    font-size: 11px;
+  }
+
+  .ve-header-ruler {
+    height: 28px;
+  }
+
+  .ve-ruler-subtick {
+    display: none;
+  }
+
+  .ve-timeline-scroll {
+    -webkit-overflow-scrolling: touch;
+    padding: 6px 0 4px;
+  }
+
+  /* Match ruler width 1:1 at default zoom so Pentagon Cap & Hairline Needle stay locked vertically */
+  .ve-timeline-canvas {
+    min-width: 100%;
+  }
+
+  /* Centered Opaque Bottom-Sheet Popovers on Mobile (zero bleed-through, zero edge clipping) */
+  .ve-mobile-sheet-scrim {
+    display: block;
+    pointer-events: auto;
+    position: fixed;
+    inset: 0;
+    z-index: 92;
+    background: rgba(15, 23, 42, 0.34);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+
+  .ve-popover,
+  .ve-curve-popover,
+  .ve-presets-popover,
+  .ve-tc-popover {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+    transform: none;
+    width: auto;
+    max-width: 400px;
+    margin: 0 auto;
+    z-index: 95;
+    border-radius: 20px;
+    padding: 10px 14px 16px;
+    background: #ffffff;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+  }
+
+  [data-atlas-theme="dark"] .ve-popover,
+  [data-atlas-theme="dark"] .ve-curve-popover,
+  [data-atlas-theme="dark"] .ve-presets-popover,
+  [data-atlas-theme="dark"] .ve-tc-popover {
+    background: #23252b;
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.62);
+  }
+
+  .ve-sheet-grabber {
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 9999px;
+    background: var(--border-1);
+    margin: 0 auto 10px;
+  }
+
+  .ve-popover-close-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  .ve-curve-preset-btn {
+    height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+    border-radius: 9px;
+  }
+
+  .ve-preset-row {
+    height: 42px;
+    padding: 0 12px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+
+  /* Mobile Thumb-Zone Bottom Mode Navigation Bar (54px + safe area) */
+  .ve-mobile-bottom-bar {
+    position: relative;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg-glass-strong);
+    border-top: 1px solid var(--border-1);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    flex-shrink: 0;
+  }
+
+  .ve-mobile-tab-btn {
+    position: relative;
+    height: 44px;
+    border-radius: 12px;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 140ms ease;
+  }
+
+  .ve-mobile-tab-btn--active {
+    color: var(--ink-1);
+  }
+
+  .ve-mobile-tab-pill {
+    position: absolute;
+    inset: 2px;
+    border-radius: 10px;
+    background: var(--bg-active);
+    z-index: 0;
+  }
+
+  [data-atlas-theme="dark"] .ve-mobile-tab-pill {
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .ve-mobile-tab-inner {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    line-height: 1.1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

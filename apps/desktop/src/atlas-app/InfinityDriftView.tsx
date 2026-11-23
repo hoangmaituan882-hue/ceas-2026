@@ -19,6 +19,11 @@ import {
   type ThemeMode,
 } from "./library-engine";
 import { RichMediaCardContent } from "./RichMediaCardContent";
+import {
+  computeCursorAnchoredPan,
+  computeWheelZoomNext,
+  type CollapseRevealHandler,
+} from "./viewport-motion";
 
 export interface InfinityDriftViewProps {
   items: readonly LibraryItem[];
@@ -37,6 +42,7 @@ export interface InfinityDriftViewProps {
   wheelZoomMode: WheelZoomMode;
   onZoomChange: (nextZoom: number) => void;
   onOpenQuickLook: (id: string, originRect?: ScreenRect, originKey?: string) => void;
+  onRegisterRevealHandler?: (handler: CollapseRevealHandler | null) => void;
 }
 
 export function InfinityDriftView({
@@ -56,6 +62,7 @@ export function InfinityDriftView({
   wheelZoomMode,
   onZoomChange,
   onOpenQuickLook,
+  onRegisterRevealHandler,
 }: InfinityDriftViewProps) {
   const m = getMessages(locale);
   const stageRef = useRef<HTMLDivElement | null>(null);
@@ -65,6 +72,14 @@ export function InfinityDriftView({
   const [isPanning, setIsPanning] = useState(false);
 
   const prevZoomRef = useRef(zoom);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const wheelZoomModeRef = useRef(wheelZoomMode);
+  wheelZoomModeRef.current = wheelZoomMode;
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
+  const zoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
+  const visibleTilesRef = useRef<ReturnType<typeof computeInfinityWallTiles>>([]);
   const wheelPanTimerRef = useRef<number | null>(null);
   const dragRef = useRef<{
     active: boolean;
@@ -110,18 +125,19 @@ export function InfinityDriftView({
     return () => ro.disconnect();
   }, []);
 
-  // Keep viewport center anchored when zooming Infinity wall smoothly (Video 00:11–00:18)
+  // Keep cursor (or viewport center) anchored when zooming Infinity wall smoothly
   useEffect(() => {
     const prevZoom = prevZoomRef.current;
     if (prevZoom !== zoom && prevZoom > 0) {
-      const ratio = zoom / prevZoom;
-      const cx = viewport.width / 2;
-      const cy = viewport.height / 2;
+      const anchor = zoomAnchorRef.current ?? {
+        x: viewport.width / 2,
+        y: viewport.height / 2,
+      };
+      zoomAnchorRef.current = null;
       setIsPanning(false);
-      setOffset((prev) => ({
-        x: Math.round(cx - (cx - prev.x) * ratio),
-        y: Math.round(cy - (cy - prev.y) * ratio),
-      }));
+      setOffset((prev) =>
+        computeCursorAnchoredPan(prev, prevZoom, zoom, anchor.x, anchor.y),
+      );
       prevZoomRef.current = zoom;
     }
   }, [zoom, viewport.width, viewport.height]);
@@ -154,6 +170,120 @@ export function InfinityDriftView({
       ),
     [items, viewport.width, viewport.height, offset.x, offset.y, zoom, spacing],
   );
+  visibleTilesRef.current = visibleTiles;
+
+  // Native non-passive wheel listener: cursor-anchored zoom in Infinity wall
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const onNativeWheel = (e: WheelEvent) => {
+      stopCoasting();
+      const shouldZoom =
+        wheelZoomModeRef.current === "direct" || e.ctrlKey || e.metaKey;
+      if (shouldZoom) {
+        e.preventDefault();
+        setIsPanning(false);
+        const sr = stage.getBoundingClientRect();
+        zoomAnchorRef.current = {
+          x: e.clientX - sr.left,
+          y: e.clientY - sr.top,
+        };
+        const curZoom = zoomRef.current;
+        const nextZoom = computeWheelZoomNext(
+          curZoom,
+          e.deltaY,
+          e.ctrlKey || e.metaKey,
+        );
+        if (nextZoom !== curZoom) {
+          onZoomChangeRef.current(nextZoom);
+        }
+      } else {
+        e.preventDefault();
+        setIsPanning(true);
+        if (wheelPanTimerRef.current !== null) {
+          window.clearTimeout(wheelPanTimerRef.current);
+        }
+        wheelPanTimerRef.current = window.setTimeout(() => {
+          setIsPanning(false);
+          wheelPanTimerRef.current = null;
+        }, 140);
+        setOffset((prev) => ({
+          x: prev.x - e.deltaX * 0.95,
+          y: prev.y - e.deltaY * 0.95,
+        }));
+      }
+    };
+    stage.addEventListener("wheel", onNativeWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onNativeWheel);
+  }, []);
+
+  // Register collapse-reveal handler for Infinity wall
+  useEffect(() => {
+    if (!onRegisterRevealHandler) return;
+    const handler: CollapseRevealHandler = (itemId, preferredKey) => {
+      const stage = stageRef.current;
+      if (!stage) return null;
+      const sr = stage.getBoundingClientRect();
+      const tiles = visibleTilesRef.current;
+      let match = preferredKey
+        ? tiles.find((t) => t.key === preferredKey)
+        : undefined;
+      if (!match) {
+        const candidates = tiles.filter((t) => t.item.id === itemId);
+        let bestDist = Infinity;
+        for (const c of candidates) {
+          const dist = Math.hypot(
+            c.x + c.width * 0.5 - viewport.width * 0.5,
+            c.y + c.height * 0.5 - viewport.height * 0.5,
+          );
+          if (dist < bestDist) {
+            bestDist = dist;
+            match = c;
+          }
+        }
+      }
+      if (!match) return null;
+      const margin = 64;
+      const inView =
+        match.x >= margin &&
+        match.x + match.width <= viewport.width - margin &&
+        match.y >= margin &&
+        match.y + match.height <= viewport.height - margin;
+
+      const roundTenth = (n: number) => Math.round(n * 10) / 10;
+      if (inView) {
+        return {
+          cardKey: match.key,
+          didReveal: false,
+          rect: {
+            left: roundTenth(sr.left + match.x),
+            top: roundTenth(sr.top + match.y),
+            width: roundTenth(match.width),
+            height: roundTenth(match.height),
+          },
+        };
+      }
+
+      const dx = Math.round(viewport.width * 0.5 - (match.x + match.width * 0.5));
+      const dy = Math.round(viewport.height * 0.5 - (match.y + match.height * 0.5));
+      stopCoasting();
+      setIsPanning(false);
+      setOffset((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+      return {
+        cardKey: match.key,
+        didReveal: true,
+        rect: {
+          left: roundTenth(sr.left + match.x + dx),
+          top: roundTenth(sr.top + match.y + dy),
+          width: roundTenth(match.width),
+          height: roundTenth(match.height),
+        },
+      };
+    };
+
+    onRegisterRevealHandler(handler);
+    return () => onRegisterRevealHandler(null);
+  }, [onRegisterRevealHandler, viewport.width, viewport.height]);
 
   const openTileQuickLook = (el: HTMLElement, id: string, key: string) => {
     const r = el.getBoundingClientRect();
@@ -269,31 +399,6 @@ export function InfinityDriftView({
     }
   };
 
-  const handleWheel = (e: React.WheelEvent) => {
-    stopCoasting();
-    const shouldZoom =
-      wheelZoomMode === "direct" || e.ctrlKey || e.metaKey;
-    if (shouldZoom) {
-      e.preventDefault();
-      setIsPanning(false);
-      const delta = e.deltaY < 0 ? 0.1 : -0.1;
-      onZoomChange(zoom + delta);
-    } else {
-      setIsPanning(true);
-      if (wheelPanTimerRef.current !== null) {
-        window.clearTimeout(wheelPanTimerRef.current);
-      }
-      wheelPanTimerRef.current = window.setTimeout(() => {
-        setIsPanning(false);
-        wheelPanTimerRef.current = null;
-      }, 140);
-      setOffset((prev) => ({
-        x: prev.x - e.deltaX * 0.95,
-        y: prev.y - e.deltaY * 0.95,
-      }));
-    }
-  };
-
   if (items.length === 0) {
     return (
       <div className="atlas-empty">
@@ -322,7 +427,6 @@ export function InfinityDriftView({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      onWheel={handleWheel}
     >
       {visibleTiles.map((tile) => {
         const isHeroHidden = activeHeroKey === tile.key;

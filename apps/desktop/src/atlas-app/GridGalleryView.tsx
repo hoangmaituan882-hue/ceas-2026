@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HeartIcon, LinkIcon } from "./AppIcons";
 import {
   computeDragVelocityTilt,
@@ -37,6 +37,15 @@ import {
 } from "./AtomicMediaPlayerHost";
 import { formatAudioTime } from "./media-helpers";
 import { RichMediaCardContent } from "./RichMediaCardContent";
+import {
+  computeGridAnchoredScrollTop,
+  computeGridCursorAnchor,
+  computeGridRevealScrollTop,
+  computeWheelZoomNext,
+  sampleHeroEase,
+  type CollapseRevealHandler,
+  type GridZoomAnchor,
+} from "./viewport-motion";
 
 export interface GridGalleryViewProps {
   items: readonly LibraryItem[];
@@ -65,6 +74,7 @@ export interface GridGalleryViewProps {
   onTrashOrRestore: (id: string) => void;
   onHoverSidebarTarget: (targetKey: string | null) => void;
   onDropToSidebar: (itemIds: string[], target: SidebarDropTarget) => void;
+  onRegisterRevealHandler?: (handler: CollapseRevealHandler | null) => void;
 }
 
 interface CardMenuState {
@@ -138,6 +148,7 @@ export function GridGalleryView({
   onTrashOrRestore,
   onHoverSidebarTarget,
   onDropToSidebar,
+  onRegisterRevealHandler,
 }: GridGalleryViewProps) {
   const m = useMemo(() => getMessages(locale), [locale]);
   useAtomicMediaVersion();
@@ -170,6 +181,24 @@ export function GridGalleryView({
   radiusRef.current = radius;
   const messagesRef = useRef(m);
   messagesRef.current = m;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
+
+  // Cursor-following zoom anchor + smooth off-screen collapse reveal RAF
+  const lastPointerRef = useRef<{ clientX: number; clientY: number; inside: boolean }>({
+    clientX: 0,
+    clientY: 0,
+    inside: false,
+  });
+  const pendingZoomAnchorRef = useRef<GridZoomAnchor | null>(null);
+  const prevZoomRef = useRef(zoom);
+  const prevLayoutBoxesRef = useRef<{
+    cards: { id: string; x: number; y: number; width: number; height: number }[];
+    totalHeight: number;
+  }>({ cards: [], totalHeight: 0 });
+  const revealScrollRafRef = useRef<number | null>(null);
 
   const measureContentBox = useCallback(() => {
     const el = contentRef.current;
@@ -243,6 +272,193 @@ export function GridGalleryView({
   );
   const restingOriginalLayoutRef = useRef(restingOriginalLayout);
   restingOriginalLayoutRef.current = restingOriginalLayout;
+
+  const stopRevealScroll = useCallback(() => {
+    if (revealScrollRafRef.current !== null) {
+      cancelAnimationFrame(revealScrollRafRef.current);
+      revealScrollRafRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => stopRevealScroll(), [stopRevealScroll]);
+
+  // Native non-passive wheel listener so Ctrl/Cmd + wheel & trackpad pinch zoom smoothly
+  // anchored directly to the card underneath the cursor (without triggering browser page zoom).
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const onNativeWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      stopRevealScroll();
+      const curZoom = zoomRef.current;
+      const nextZoom = computeWheelZoomNext(curZoom, e.deltaY, e.ctrlKey);
+      if (nextZoom === curZoom) return;
+
+      const scrollerRect = scroller.getBoundingClientRect();
+      const contentEl = contentRef.current;
+      const contentRect = contentEl?.getBoundingClientRect();
+      const contentX = contentRect
+        ? e.clientX - contentRect.left
+        : e.clientX - scrollerRect.left;
+      const contentY = contentRect
+        ? e.clientY - contentRect.top
+        : e.clientY - scrollerRect.top + scroller.scrollTop;
+      const viewportY = e.clientY - scrollerRect.top;
+
+      const boxes = layoutRef.current.cards.map((c) => ({
+        id: c.item.id,
+        x: c.x,
+        y: c.y,
+        width: c.width,
+        height: c.height,
+      }));
+      pendingZoomAnchorRef.current = computeGridCursorAnchor(
+        boxes,
+        contentX,
+        contentY,
+        viewportY,
+        layoutRef.current.totalHeight,
+      );
+      onZoomChangeRef.current(nextZoom);
+    };
+    scroller.addEventListener("wheel", onNativeWheel, { passive: false });
+    return () => scroller.removeEventListener("wheel", onNativeWheel);
+  }, [stopRevealScroll]);
+
+  // Synchronously adjust scrollTop before browser paint whenever zoom changes so the
+  // card under the cursor (or viewport center when dragging the bottom zoom slider) stays pinned!
+  useLayoutEffect(() => {
+    const newBoxes = layout.cards.map((c) => ({
+      id: c.item.id,
+      x: c.x,
+      y: c.y,
+      width: c.width,
+      height: c.height,
+    }));
+
+    if (prevZoomRef.current !== zoom) {
+      const scroller = scrollerRef.current;
+      const contentEl = contentRef.current;
+      if (scroller && contentEl) {
+        const scrollerRect = scroller.getBoundingClientRect();
+        const contentRect = contentEl.getBoundingClientRect();
+        const contentPaddingTop = Math.max(
+          0,
+          Math.round(contentRect.top - scrollerRect.top + scroller.scrollTop),
+        );
+
+        let anchor = pendingZoomAnchorRef.current;
+        pendingZoomAnchorRef.current = null;
+
+        if (!anchor) {
+          const ptr = lastPointerRef.current;
+          const useCursor = ptr.inside;
+          const clientX = useCursor
+            ? ptr.clientX
+            : scrollerRect.left + scrollerRect.width * 0.5;
+          const clientY = useCursor
+            ? ptr.clientY
+            : scrollerRect.top + scrollerRect.height * 0.48;
+          const contentX = clientX - contentRect.left;
+          const contentY = clientY - contentRect.top;
+          const viewportY = clientY - scrollerRect.top;
+          anchor = computeGridCursorAnchor(
+            prevLayoutBoxesRef.current.cards,
+            contentX,
+            contentY,
+            viewportY,
+            prevLayoutBoxesRef.current.totalHeight,
+          );
+        }
+
+        const nextScrollTop = computeGridAnchoredScrollTop(
+          newBoxes,
+          anchor,
+          layout.totalHeight,
+          scroller.clientHeight,
+          contentPaddingTop,
+        );
+        scroller.scrollTop = nextScrollTop;
+        measureContentBox();
+      }
+      prevZoomRef.current = zoom;
+    }
+
+    prevLayoutBoxesRef.current = {
+      cards: newBoxes,
+      totalHeight: layout.totalHeight,
+    };
+  }, [zoom, layout, measureContentBox]);
+
+  // Register collapse-reveal handler so collapsing an off-screen item smoothly scrolls it
+  // into view in lockstep with the QuickLook Hero flight and returns its exact post-scroll rect.
+  useEffect(() => {
+    if (!onRegisterRevealHandler) return;
+    const handler: CollapseRevealHandler = (itemId, _preferredKey, durationMs) => {
+      const scroller = scrollerRef.current;
+      const contentEl = contentRef.current;
+      if (!scroller || !contentEl) return null;
+
+      const entry = restingOriginalLayoutRef.current.cards.find(
+        (c) => c.item.id === itemId,
+      );
+      if (!entry) return null;
+
+      stopRevealScroll();
+      const scrollerRect = scroller.getBoundingClientRect();
+      const contentRect = contentEl.getBoundingClientRect();
+      const startScrollTop = scroller.scrollTop;
+      const contentTopAtZeroScroll = contentRect.top + startScrollTop;
+      const contentOffsetInScroller =
+        contentRect.top - scrollerRect.top + startScrollTop;
+      const cardTopInScroller = contentOffsetInScroller + entry.y;
+
+      const reveal = computeGridRevealScrollTop(
+        cardTopInScroller,
+        entry.height,
+        startScrollTop,
+        scroller.clientHeight,
+        scroller.scrollHeight,
+        68,
+      );
+
+      if (reveal.needsScroll) {
+        const targetScrollTop = reveal.targetScrollTop;
+        const safeDuration = Math.max(120, durationMs);
+        const startAt = performance.now();
+        const step = (now: number) => {
+          const t = Math.min(1, (now - startAt) / safeDuration);
+          const eased = sampleHeroEase(t);
+          scroller.scrollTop =
+            startScrollTop + (targetScrollTop - startScrollTop) * eased;
+          if (t < 1) {
+            revealScrollRafRef.current = requestAnimationFrame(step);
+          } else {
+            scroller.scrollTop = targetScrollTop;
+            revealScrollRafRef.current = null;
+            measureContentBox();
+          }
+        };
+        revealScrollRafRef.current = requestAnimationFrame(step);
+      }
+
+      const roundTenth = (n: number) => Math.round(n * 10) / 10;
+      return {
+        cardKey: `grid:${itemId}`,
+        didReveal: reveal.needsScroll,
+        rect: {
+          left: roundTenth(contentRect.left + entry.x),
+          top: roundTenth(contentTopAtZeroScroll + entry.y - reveal.targetScrollTop),
+          width: roundTenth(entry.width),
+          height: roundTenth(entry.height),
+        },
+      };
+    };
+
+    onRegisterRevealHandler(handler);
+    return () => onRegisterRevealHandler(null);
+  }, [onRegisterRevealHandler, stopRevealScroll, measureContentBox]);
 
   const stopAutoScroll = useCallback(() => {
     if (autoScrollRafRef.current !== null) {
@@ -867,14 +1083,6 @@ export function GridGalleryView({
     });
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const delta = e.deltaY < 0 ? 0.12 : -0.12;
-      onZoomChange(zoom + delta);
-    }
-  };
-
   if (items.length === 0) {
     return (
       <div className="atlas-empty">
@@ -886,6 +1094,7 @@ export function GridGalleryView({
 
   const imgFit = layoutMode === "fit" ? "contain" : "cover";
   const isHeroSession = heroPush.heroKey !== null;
+  const isZoomSyncFrame = prevZoomRef.current !== zoom;
   const activeDraggedSet = useMemo(() => {
     if (!dragSession) return new Set<string>();
     return new Set(dragSession.items.map((it) => it.id));
@@ -906,7 +1115,16 @@ export function GridGalleryView({
       }`}
       data-testid="grid-scroller"
       onScroll={measureContentBox}
-      onWheel={handleWheel}
+      onPointerMove={(e) => {
+        lastPointerRef.current = {
+          clientX: e.clientX,
+          clientY: e.clientY,
+          inside: true,
+        };
+      }}
+      onPointerLeave={() => {
+        lastPointerRef.current.inside = false;
+      }}
       onPointerDown={handleScrollerPointerDown}
     >
       <div
@@ -985,13 +1203,15 @@ export function GridGalleryView({
                         ease: HERO_MOTION_EASE,
                       },
                     }
-                  : {
-                      type: "spring",
-                      stiffness: 410,
-                      damping: 35,
-                      mass: 0.74,
-                      opacity: { duration: 0 },
-                    }
+                  : isZoomSyncFrame
+                    ? { duration: 0 }
+                    : {
+                        type: "spring",
+                        stiffness: 410,
+                        damping: 35,
+                        mass: 0.74,
+                        opacity: { duration: 0 },
+                      }
               }
               role="button"
               tabIndex={0}

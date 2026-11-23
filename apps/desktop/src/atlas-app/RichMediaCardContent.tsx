@@ -11,6 +11,11 @@ import { computeSharedGifPhase } from "./hero-transition";
 import { formatAudioTime, type GifAnimationKind } from "./media-helpers";
 import { renderModelThumbnail } from "./model3d-engine";
 import type { LibraryItem, ThemeMode } from "./library-engine";
+import {
+  buildVideoCssFilter,
+  buildVideoPreviewTransform,
+  hasNonDestructiveEdits,
+} from "./video-editor-engine";
 
 export function drawProceduralGifFrame(
   ctx: CanvasRenderingContext2D,
@@ -435,8 +440,21 @@ export function RichMediaCardContent({
   if (item.kind === "video") {
     const videoActive =
       interactiveAudio && atomicMediaPlayerManager.isItemActive(item.id);
+    const isEdited = hasNonDestructiveEdits(item.videoEdit, item);
+    const cardFilter = item.videoEdit
+      ? buildVideoCssFilter(item.videoEdit.grade)
+      : undefined;
+    const cardTransform = item.videoEdit
+      ? buildVideoPreviewTransform(item.videoEdit.transform)
+      : undefined;
     return (
-      <div className="rich-card rich-card--video">
+      <div
+        className="rich-card rich-card--video"
+        style={{
+          filter: cardFilter,
+          transform: cardTransform,
+        }}
+      >
         <img
           src={item.src}
           alt={item.title}
@@ -447,6 +465,13 @@ export function RichMediaCardContent({
           }}
         />
         {videoActive && <AtomicVideoSlot item={item} slotKind="card" />}
+        {isEdited && (
+          <span
+            className="rich-video-edited-dot"
+            title="Non-destructive edits active"
+            aria-hidden="true"
+          />
+        )}
       </div>
     );
   }

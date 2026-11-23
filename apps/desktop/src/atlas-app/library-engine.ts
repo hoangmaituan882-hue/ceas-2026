@@ -5,6 +5,7 @@ import type {
   LibraryItemKind,
   Model3DMeta,
 } from "./media-helpers";
+import type { VideoEditRecipe } from "./video-editor-engine";
 
 export type ViewMode = "grid" | "canvas" | "infinity";
 export type GridLayoutMode = "justified" | "square" | "fit";
@@ -24,6 +25,7 @@ export interface LibraryItem {
   modelMeta?: Model3DMeta;
   fontMeta?: FontMeta;
   gifMeta?: GifMeta;
+  videoEdit?: VideoEditRecipe;
   collectionId: string | null;
   tags: string[];
   liked: boolean;
@@ -71,7 +73,7 @@ export interface AppearancePrefs {
 
 export function clampZoom(value: number): number {
   if (!Number.isFinite(value)) return 1.15;
-  return Math.round(Math.min(2.4, Math.max(0.65, value)) * 20) / 20;
+  return Math.round(Math.min(2.4, Math.max(0.65, value)) * 100) / 100;
 }
 
 export function clampSpacing(value: number): number {

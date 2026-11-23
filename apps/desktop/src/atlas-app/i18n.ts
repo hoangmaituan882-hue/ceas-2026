@@ -514,6 +514,80 @@ export interface AtlasMessages {
   gifPrevFrame: string;
   gifNextFrame: string;
   gifScrubLabel: string;
+
+  // Non-destructive Video Studio Editor
+  videoEditBtn: string;
+  videoEditedTag: string;
+  veTabEdit: string;
+  veTabColor: string;
+  veTabMotion: string;
+  veBackQuickLook: string;
+  veCompareOriginal: string;
+  veOriginalActive: string;
+  veResetAll: string;
+  veDoneSave: string;
+  veUndo: string;
+  veRedo: string;
+  veMinimize: string;
+  veExpand: string;
+  veAutoBrightness: string;
+  veUpscale: string;
+  veBrightness: string;
+  veContrast: string;
+  veBlur: string;
+  veSaturation: string;
+  veExposure: string;
+  veWarmth: string;
+  vePositionX: string;
+  vePositionY: string;
+  veOpacity: string;
+  veRotation: string;
+  veToolSpeed: string;
+  veToolCrop: string;
+  veToolRotate: string;
+  veToolFlip: string;
+  veToolGrade: string;
+  veToolKeyframes: string;
+  veToolExportRecipe: string;
+  veSplitClip: string;
+  veAddKeyframe: string;
+  veDuplicateClip: string;
+  veDeleteClip: string;
+  veAnimateRecord: string;
+  veStopAnimating: string;
+  veScriptMarkers: string;
+  veAddMarker: string;
+  veSnapMagnet: string;
+  veTimelineZoom: string;
+  veAspectOriginal: string;
+  veLookLayerTitle: string;
+  veAddClipHint: string;
+  veToastSaved: string;
+  veToastReset: string;
+  veToastSplit: string;
+  veToastClipAdded: (title: string) => string;
+  veToastExportedRecipe: string;
+  veEasingCurve: string;
+  veMotionPresets: string;
+  veLoopPlayback: string;
+  veJumpStart: string;
+  veTimecodeModeLabel: string;
+  veTimecodeModeTc: string;
+  veTimecodeModeFrames: string;
+  veTimecodeModeSec: string;
+  veEasingLinear: string;
+  veEasingEaseOut: string;
+  veEasingEaseInOut: string;
+  veEasingExpoOut: string;
+  veEasingOvershoot: string;
+  vePresetKenBurns: string;
+  vePresetCinematicReveal: string;
+  vePresetMicroZoom: string;
+  vePresetGentleTilt: string;
+  vePresetFadePulse: string;
+  vePresetClear: string;
+  veToastPresetApplied: (name: string) => string;
+  veVectorPathLayer: string;
 }
 
 const EN_MESSAGES: AtlasMessages = {
@@ -879,6 +953,79 @@ const EN_MESSAGES: AtlasMessages = {
   gifPrevFrame: "Previous frame",
   gifNextFrame: "Next frame",
   gifScrubLabel: "GIF frame scrubber",
+
+  videoEditBtn: "Edit",
+  videoEditedTag: "Edited",
+  veTabEdit: "Studio",
+  veTabColor: "Adjust",
+  veTabMotion: "Motion",
+  veBackQuickLook: "Back to Preview",
+  veCompareOriginal: "Compare",
+  veOriginalActive: "Original",
+  veResetAll: "Reset",
+  veDoneSave: "Done",
+  veUndo: "Undo",
+  veRedo: "Redo",
+  veMinimize: "Minimize",
+  veExpand: "Controls",
+  veAutoBrightness: "Auto Brightness",
+  veUpscale: "Upscale",
+  veBrightness: "Brightness",
+  veContrast: "Contrast",
+  veBlur: "Blur",
+  veSaturation: "Saturation",
+  veExposure: "Exposure",
+  veWarmth: "Warmth",
+  vePositionX: "Position X",
+  vePositionY: "Position Y",
+  veOpacity: "Opacity",
+  veRotation: "Rotation",
+  veToolSpeed: "Playback Speed",
+  veToolCrop: "Aspect & Crop",
+  veToolRotate: "Rotate 90°",
+  veToolFlip: "Flip Horizontal",
+  veToolGrade: "Color Adjust",
+  veToolKeyframes: "Keyframes",
+  veToolExportRecipe: "Export Edit Recipe",
+  veSplitClip: "Split Clip (B)",
+  veAddKeyframe: "Add Keyframe (K)",
+  veDuplicateClip: "Duplicate Clip",
+  veDeleteClip: "Delete Clip",
+  veAnimateRecord: "Start animating",
+  veStopAnimating: "Stop animating",
+  veScriptMarkers: "Script",
+  veAddMarker: "Add Beat",
+  veSnapMagnet: "Snap",
+  veTimelineZoom: "Timeline zoom",
+  veAspectOriginal: "Original",
+  veLookLayerTitle: "Vector Path Transform",
+  veAddClipHint: "Append to timeline",
+  veToastSaved: "Saved non-destructive video edits",
+  veToastReset: "Restored original unedited video",
+  veToastSplit: "Split clip at playhead",
+  veToastClipAdded: (title) => `Appended "${title}" to timeline`,
+  veToastExportedRecipe: "Exported non-destructive edit recipe (.json)",
+  veEasingCurve: "Easing Graph",
+  veMotionPresets: "Smart Motion",
+  veLoopPlayback: "Loop playback",
+  veJumpStart: "Jump to start",
+  veTimecodeModeLabel: "Timecode format",
+  veTimecodeModeTc: "Timecode (MM:SS:ms)",
+  veTimecodeModeFrames: "Frames (30 fps)",
+  veTimecodeModeSec: "Seconds (0.00s)",
+  veEasingLinear: "Linear",
+  veEasingEaseOut: "Ease Out",
+  veEasingEaseInOut: "Ease In-Out",
+  veEasingExpoOut: "Expo Snap",
+  veEasingOvershoot: "Spring",
+  vePresetKenBurns: "Ken Burns Drift",
+  vePresetCinematicReveal: "Cinematic Reveal",
+  vePresetMicroZoom: "Floating Parallax",
+  vePresetGentleTilt: "Gentle Sway",
+  vePresetFadePulse: "Film Fade In/Out",
+  vePresetClear: "Clear Motion Keys",
+  veToastPresetApplied: (name) => `Applied "${name}" motion preset`,
+  veVectorPathLayer: "Vector Path Transform",
 };
 
 const ZH_MESSAGES: AtlasMessages = {
@@ -1232,6 +1379,79 @@ const ZH_MESSAGES: AtlasMessages = {
   gifPrevFrame: "上一帧",
   gifNextFrame: "下一帧",
   gifScrubLabel: "GIF 帧进度",
+
+  videoEditBtn: "编辑",
+  videoEditedTag: "已调色剪辑",
+  veTabEdit: "工作台",
+  veTabColor: "调色",
+  veTabMotion: "关键帧",
+  veBackQuickLook: "返回预览",
+  veCompareOriginal: "原片对比",
+  veOriginalActive: "原片",
+  veResetAll: "还原原片",
+  veDoneSave: "完成",
+  veUndo: "撤销",
+  veRedo: "重做",
+  veMinimize: "收起面板",
+  veExpand: "展开调节",
+  veAutoBrightness: "自动亮度",
+  veUpscale: "画质增强",
+  veBrightness: "亮度",
+  veContrast: "对比度",
+  veBlur: "模糊",
+  veSaturation: "饱和度",
+  veExposure: "曝光",
+  veWarmth: "色温",
+  vePositionX: "水平位移",
+  vePositionY: "垂直位移",
+  veOpacity: "不透明度",
+  veRotation: "旋转角度",
+  veToolSpeed: "播放倍速",
+  veToolCrop: "画幅裁切",
+  veToolRotate: "顺时针旋转 90°",
+  veToolFlip: "水平镜像",
+  veToolGrade: "色彩调节",
+  veToolKeyframes: "关键帧轨道",
+  veToolExportRecipe: "导出非破坏性工程",
+  veSplitClip: "分割片段 (B)",
+  veAddKeyframe: "插入关键帧 (K)",
+  veDuplicateClip: "复制片段",
+  veDeleteClip: "删除片段",
+  veAnimateRecord: "开始动画",
+  veStopAnimating: "停止动画",
+  veScriptMarkers: "脚本标记",
+  veAddMarker: "添加标记",
+  veSnapMagnet: "磁吸对齐",
+  veTimelineZoom: "时间轴缩放",
+  veAspectOriginal: "原始比例",
+  veLookLayerTitle: "矢量路径与调色变换",
+  veAddClipHint: "追加到时间轴",
+  veToastSaved: "已保存非破坏性视频编辑",
+  veToastReset: "已无损还原至原始视频",
+  veToastSplit: "已在播放头位置分割片段",
+  veToastClipAdded: (title) => `已追加「${title}」到时间轴`,
+  veToastExportedRecipe: "已导出非破坏性编辑方案 (.json)",
+  veEasingCurve: "缓动曲线图",
+  veMotionPresets: "智能动效预设",
+  veLoopPlayback: "循环播放",
+  veJumpStart: "回到起点",
+  veTimecodeModeLabel: "时间码格式",
+  veTimecodeModeTc: "时间码 (MM:SS:ms)",
+  veTimecodeModeFrames: "帧数 (30 fps)",
+  veTimecodeModeSec: "秒数 (0.00s)",
+  veEasingLinear: "线性",
+  veEasingEaseOut: "平滑缓出",
+  veEasingEaseInOut: "经典缓入缓出",
+  veEasingExpoOut: "迅捷吸附",
+  veEasingOvershoot: "弹簧过冲",
+  vePresetKenBurns: "电影缓推平移",
+  vePresetCinematicReveal: "丝滑淡入浮现",
+  vePresetMicroZoom: "悬浮视差漂移",
+  vePresetGentleTilt: "轻微律动摇摆",
+  vePresetFadePulse: "胶片淡入淡出",
+  vePresetClear: "清除动效关键帧",
+  veToastPresetApplied: (name) => `已应用「${name}」动效预设`,
+  veVectorPathLayer: "矢量路径与调色变换",
 };
 
 export function getMessages(locale: AppLocale): AtlasMessages {

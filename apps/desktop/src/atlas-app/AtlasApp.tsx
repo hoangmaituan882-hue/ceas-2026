@@ -42,12 +42,14 @@ import {
 } from "./canvas-physics";
 import {
   computeLightboxTargetRect,
+  HERO_CLOSE_DURATION_S,
   resolveHeroHandoffFlags,
   unpushCardRect,
   type HeroPushContext,
   type QuickLookPhase,
   type ScreenRect,
 } from "./hero-transition";
+import type { CollapseRevealHandler } from "./viewport-motion";
 import {
   DEFAULT_SETTINGS,
   getDisplayLibraryName,
@@ -81,10 +83,12 @@ import {
   INITIAL_LIBRARY_ITEMS,
   INITIAL_TAG_FOLDERS,
 } from "./seed-library";
+import type { VideoEditRecipe } from "./video-editor-engine";
 import "./atlas-app.css";
 
 const APPEARANCE_STORAGE_KEY = "atlas-app-appearance-v1";
 const SETTINGS_STORAGE_KEY = "atlas-app-settings-v1";
+const VIDEO_EDITS_STORAGE_KEY = "atlas-app-video-edits-v1";
 const COLLECTION_PALETTE = [
   "#ff7a18",
   "#007aff",
@@ -133,13 +137,29 @@ function loadSettings(): AppSettings {
   }
 }
 
+function loadSavedVideoEdits(): Record<string, VideoEditRecipe> {
+  try {
+    const raw = window.localStorage.getItem(VIDEO_EDITS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, VideoEditRecipe>;
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function buildInitialLibraryItems(): LibraryItem[] {
+  const savedVideoEdits = loadSavedVideoEdits();
   const layout = computeHarmoniousCanvasClusters(INITIAL_LIBRARY_ITEMS, 12, 128);
   return INITIAL_LIBRARY_ITEMS.map((item, idx) => {
     const p = layout[item.id];
-    if (!p) return item;
+    const savedEdit = savedVideoEdits[item.id];
+    if (!p) {
+      return savedEdit ? { ...item, videoEdit: savedEdit } : item;
+    }
     return {
       ...item,
+      ...(savedEdit ? { videoEdit: savedEdit } : {}),
       canvasX: p.x,
       canvasY: p.y,
       canvasW: p.w,
@@ -195,6 +215,16 @@ export function AtlasApp() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const sidebarPulseTimerRef = useRef<number | null>(null);
+  const revealHandlerRef = useRef<CollapseRevealHandler | null>(null);
+  const quickLookStateRef = useRef(quickLookState);
+  quickLookStateRef.current = quickLookState;
+
+  const handleRegisterRevealHandler = useCallback(
+    (handler: CollapseRevealHandler | null) => {
+      revealHandlerRef.current = handler;
+    },
+    [],
+  );
 
   const notify = useCallback((message: string) => {
     setToast(message);
@@ -228,6 +258,29 @@ export function AtlasApp() {
       // Ignore storage quota issues
     }
   }, [settings]);
+
+  const handleUpdateVideoEdit = useCallback(
+    (id: string, recipe: VideoEditRecipe | undefined) => {
+      setItems((prev) =>
+        prev.map((it) => (it.id === id ? { ...it, videoEdit: recipe } : it)),
+      );
+      try {
+        const current = loadSavedVideoEdits();
+        if (recipe) {
+          current[id] = recipe;
+        } else {
+          delete current[id];
+        }
+        window.localStorage.setItem(
+          VIDEO_EDITS_STORAGE_KEY,
+          JSON.stringify(current),
+        );
+      } catch {
+        // Ignore storage quota issues
+      }
+    },
+    [],
+  );
 
   const m = useMemo(() => getMessages(settings.locale), [settings.locale]);
   const displayLibraryName = useMemo(
@@ -354,24 +407,40 @@ export function AtlasApp() {
   );
 
   const requestCloseQuickLook = useCallback(() => {
-    setQuickLookState((prev) => {
-      if (!prev || prev.phase !== "open") return prev;
-      const targetKey =
-        prev.id === prev.originItemId
-          ? prev.originCardKey
-          : `${viewMode}:${prev.id}`;
-      const resolvedReturn =
-        prev.id === prev.originItemId && prev.originRect
-          ? prev.originRect
-          : resolveLiveRestingCardRect(prev.id, targetKey);
-      setLastFocused({ id: prev.id, key: targetKey });
+    const prev = quickLookStateRef.current;
+    if (!prev || prev.phase !== "open") return;
+
+    const targetKey =
+      prev.id === prev.originItemId
+        ? prev.originCardKey
+        : `${viewMode}:${prev.id}`;
+    const closeDurationMs = Math.round(
+      HERO_CLOSE_DURATION_S * speedMultiplier * 1000,
+    );
+    const revealed = revealHandlerRef.current?.(
+      prev.id,
+      targetKey,
+      closeDurationMs,
+    );
+    const resolvedKey = revealed?.cardKey ?? targetKey;
+    const resolvedReturn =
+      revealed?.rect ??
+      (prev.id === prev.originItemId && prev.originRect
+        ? prev.originRect
+        : resolveLiveRestingCardRect(prev.id, resolvedKey));
+
+    setLastFocused({ id: prev.id, key: resolvedKey });
+    setQuickLookState((cur) => {
+      if (!cur || cur.phase !== "open") return cur;
       return {
-        ...prev,
+        ...cur,
+        originItemId: cur.id,
+        originCardKey: resolvedKey,
         returnRect: resolvedReturn,
         phase: "closing",
       };
     });
-  }, [viewMode, resolveLiveRestingCardRect]);
+  }, [viewMode, speedMultiplier, resolveLiveRestingCardRect]);
 
   const beginLandingQuickLook = useCallback(() => {
     setQuickLookState((prev) => {
@@ -1346,6 +1415,7 @@ export function AtlasApp() {
                 onTrashOrRestore={handleTrashOrRestore}
                 onHoverSidebarTarget={setActiveSidebarDropKey}
                 onDropToSidebar={handleDropToSidebar}
+                onRegisterRevealHandler={handleRegisterRevealHandler}
               />
             </motion.div>
           )}
@@ -1390,6 +1460,7 @@ export function AtlasApp() {
                 onDropToSidebar={handleDropToSidebar}
                 onImportClick={() => fileInputRef.current?.click()}
                 onTidyCanvas={handleTidyCanvas}
+                onRegisterRevealHandler={handleRegisterRevealHandler}
               />
             </motion.div>
           )}
@@ -1422,6 +1493,7 @@ export function AtlasApp() {
                   setAppearance((prev) => ({ ...prev, zoom: clampZoom(z) }))
                 }
                 onOpenQuickLook={openQuickLook}
+                onRegisterRevealHandler={handleRegisterRevealHandler}
               />
             </motion.div>
           )}
@@ -1749,6 +1821,7 @@ export function AtlasApp() {
           atomicMediaPlayerManager.pinToPip(targetItem);
           requestCloseQuickLook();
         }}
+        onUpdateVideoEdit={handleUpdateVideoEdit}
         onNotify={notify}
       />
 

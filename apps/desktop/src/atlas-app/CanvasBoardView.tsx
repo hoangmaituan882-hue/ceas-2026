@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { HeartIcon, LinkIcon } from "./AppIcons";
 import {
   computeMagneticSnap,
@@ -56,6 +56,12 @@ import {
 } from "./AtomicMediaPlayerHost";
 import { formatAudioTime } from "./media-helpers";
 import { RichMediaCardContent } from "./RichMediaCardContent";
+import {
+  computeCanvasRevealForCollapse,
+  computeCursorAnchoredPan,
+  computeWheelZoomNext,
+  type CollapseRevealHandler,
+} from "./viewport-motion";
 
 export interface CanvasBoardViewProps {
   items: readonly LibraryItem[];
@@ -88,6 +94,7 @@ export interface CanvasBoardViewProps {
   onDropToSidebar: (itemIds: string[], target: SidebarDropTarget) => void;
   onImportClick: () => void;
   onTidyCanvas: () => void;
+  onRegisterRevealHandler?: (handler: CollapseRevealHandler | null) => void;
 }
 
 interface DragState {
@@ -173,12 +180,14 @@ export function CanvasBoardView({
   onDropToSidebar,
   onImportClick,
   onTidyCanvas,
+  onRegisterRevealHandler,
 }: CanvasBoardViewProps) {
   const m = useMemo(() => getMessages(locale), [locale]);
   useAtomicMediaVersion();
   const initialPanX = sidebarOffset > 0 ? 236 : 42;
   const [pan, setPan] = useState({ x: initialPanX, y: 52 });
   const [smoothCamera, setSmoothCamera] = useState(false);
+  const [smoothDurationMs, setSmoothDurationMs] = useState(320);
   const [toolMode, setToolMode] = useState<CanvasToolMode>("select");
   const [draggingIds, setDraggingIds] = useState<Set<string>>(() => new Set());
   const [livePositions, setLivePositions] = useState<
@@ -213,7 +222,28 @@ export function CanvasBoardView({
   const widgetSeqRef = useRef(2);
   const justDraggedWidgetIdRef = useRef<string | null>(null);
 
-  const triggerSmoothCamera = useCallback(() => {
+  // Fresh refs for native non-passive cursor-following wheel zoom & collapse reveal
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const wheelZoomModeRef = useRef(wheelZoomMode);
+  wheelZoomModeRef.current = wheelZoomMode;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
+  const lastStagePointerRef = useRef<{ x: number; y: number; inside: boolean }>({
+    x: 0,
+    y: 0,
+    inside: false,
+  });
+  const prevZoomRef = useRef(zoom);
+  const zoomHandledInternallyRef = useRef<number | null>(null);
+
+  const triggerSmoothCamera = useCallback((durationMs = 320) => {
+    const safeMs = Math.max(120, Math.round(durationMs));
+    setSmoothDurationMs(safeMs);
     setSmoothCamera(true);
     if (smoothTimerRef.current !== null) {
       window.clearTimeout(smoothTimerRef.current);
@@ -221,7 +251,7 @@ export function CanvasBoardView({
     smoothTimerRef.current = window.setTimeout(() => {
       setSmoothCamera(false);
       smoothTimerRef.current = null;
-    }, 340);
+    }, safeMs + 24);
   }, []);
 
   const stopCoasting = useCallback(() => {
@@ -286,19 +316,128 @@ export function CanvasBoardView({
       const centerY = vh * 0.5;
       const nextZoom = Math.min(
         2.4,
-        Math.max(0.65, Math.round((zoom + delta) * 20) / 20),
+        Math.max(0.65, Math.round((zoom + delta) * 100) / 100),
       );
       if (nextZoom === zoom) return;
-      const ratio = nextZoom / zoom;
-      triggerSmoothCamera();
-      setPan((prev) => ({
-        x: Math.round(centerX - (centerX - prev.x) * ratio),
-        y: Math.round(centerY - (centerY - prev.y) * ratio),
-      }));
+      zoomHandledInternallyRef.current = nextZoom;
+      triggerSmoothCamera(260);
+      setPan((prev) =>
+        computeCursorAnchoredPan(prev, zoom, nextZoom, centerX, centerY),
+      );
       onZoomChange(nextZoom);
     },
     [zoom, sidebarOffset, onZoomChange, stopCoasting, triggerSmoothCamera],
   );
+
+  // Anchor zoom cleanly when changed via external bottom zoom slider
+  useLayoutEffect(() => {
+    const prevZoom = prevZoomRef.current;
+    if (prevZoom !== zoom) {
+      if (zoomHandledInternallyRef.current === zoom) {
+        zoomHandledInternallyRef.current = null;
+      } else {
+        const stageRect = stageRef.current?.getBoundingClientRect();
+        const vw = stageRect?.width ?? window.innerWidth;
+        const vh = stageRect?.height ?? window.innerHeight;
+        const ptr = lastStagePointerRef.current;
+        const anchorX = ptr.inside ? ptr.x : sidebarOffset + (vw - sidebarOffset) * 0.5;
+        const anchorY = ptr.inside ? ptr.y : vh * 0.5;
+        setPan((prev) =>
+          computeCursorAnchoredPan(prev, prevZoom, zoom, anchorX, anchorY),
+        );
+      }
+      prevZoomRef.current = zoom;
+    }
+  }, [zoom, sidebarOffset]);
+
+  // Native non-passive wheel listener: zoom follows the cursor smoothly on pinch / Ctrl+wheel / direct mode
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const onNativeWheel = (e: WheelEvent) => {
+      stopCoasting();
+      const shouldZoom =
+        wheelZoomModeRef.current === "direct" || e.ctrlKey || e.metaKey;
+      if (shouldZoom) {
+        e.preventDefault();
+        const stageRect = stage.getBoundingClientRect();
+        const pointerX = e.clientX - stageRect.left;
+        const pointerY = e.clientY - stageRect.top;
+        lastStagePointerRef.current = { x: pointerX, y: pointerY, inside: true };
+
+        const curZoom = zoomRef.current;
+        const nextZoom = computeWheelZoomNext(
+          curZoom,
+          e.deltaY,
+          e.ctrlKey || e.metaKey,
+        );
+        if (nextZoom !== curZoom) {
+          zoomHandledInternallyRef.current = nextZoom;
+          setSmoothCamera(false);
+          setPan((prev) =>
+            computeCursorAnchoredPan(prev, curZoom, nextZoom, pointerX, pointerY),
+          );
+          onZoomChangeRef.current(nextZoom);
+        }
+      } else {
+        e.preventDefault();
+        setSmoothCamera(false);
+        setPan((prev) => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
+      }
+    };
+    stage.addEventListener("wheel", onNativeWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onNativeWheel);
+  }, [stopCoasting]);
+
+  // Register collapse-reveal handler: collapsing an off-screen Canvas item automatically pans
+  // it smoothly into view in lockstep with QuickLook collapse and returns its exact post-pan rect!
+  useEffect(() => {
+    if (!onRegisterRevealHandler) return;
+    const handler: CollapseRevealHandler = (itemId, _preferredKey, durationMs) => {
+      const stage = stageRef.current;
+      if (!stage) return null;
+      const item = itemsRef.current.find((it) => it.id === itemId);
+      if (!item) return null;
+
+      const aspect = item.height > 0 ? item.width / item.height : 1;
+      const nodeH = Math.round(item.canvasW / aspect);
+      const stageRect = stage.getBoundingClientRect();
+      const reveal = computeCanvasRevealForCollapse(
+        {
+          x: item.canvasX,
+          y: item.canvasY,
+          width: item.canvasW,
+          height: nodeH,
+        },
+        panRef.current,
+        zoomRef.current,
+        stageRect.left,
+        stageRect.top,
+        stageRect.width,
+        stageRect.height,
+        sidebarOffset,
+        72,
+      );
+
+      if (reveal.needsPan) {
+        stopCoasting();
+        triggerSmoothCamera(durationMs);
+        setPan(reveal.targetPan);
+      }
+
+      return {
+        cardKey: `canvas:${item.id}`,
+        didReveal: reveal.needsPan,
+        rect: reveal.finalScreenRect,
+      };
+    };
+
+    onRegisterRevealHandler(handler);
+    return () => onRegisterRevealHandler(null);
+  }, [onRegisterRevealHandler, sidebarOffset, stopCoasting, triggerSmoothCamera]);
 
   const handleFitView = useCallback(() => {
     stopCoasting();
@@ -336,7 +475,8 @@ export function CanvasBoardView({
     ];
 
     const fit = computeCanvasFitViewport(boxes, vw, vh, sidebarOffset, 50);
-    triggerSmoothCamera();
+    zoomHandledInternallyRef.current = fit.zoom;
+    triggerSmoothCamera(320);
     setPan({ x: fit.panX, y: fit.panY });
     onZoomChange(fit.zoom);
   }, [items, notes, comments, sidebarOffset, onZoomChange, stopCoasting, triggerSmoothCamera]);
@@ -1044,34 +1184,6 @@ export function CanvasBoardView({
     }
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    stopCoasting();
-    const shouldZoom =
-      wheelZoomMode === "direct" || e.ctrlKey || e.metaKey;
-    if (shouldZoom) {
-      e.preventDefault();
-      const stageRect = stageRef.current?.getBoundingClientRect();
-      const pointerX = stageRect ? e.clientX - stageRect.left : e.clientX;
-      const pointerY = stageRect ? e.clientY - stageRect.top : e.clientY;
-
-      const factor = e.deltaY < 0 ? 1.09 : 0.92;
-      const nextZoom = Math.min(2.4, Math.max(0.65, Math.round(zoom * factor * 20) / 20));
-      if (nextZoom !== zoom) {
-        const ratio = nextZoom / zoom;
-        setPan((prev) => ({
-          x: pointerX - (pointerX - prev.x) * ratio,
-          y: pointerY - (pointerY - prev.y) * ratio,
-        }));
-        onZoomChange(nextZoom);
-      }
-    } else {
-      setPan((prev) => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY,
-      }));
-    }
-  };
-
   const handleFlightComplete = useCallback((sessionId: number) => {
     setDragSession((prev) => (prev && prev.id === sessionId ? null : prev));
   }, []);
@@ -1114,15 +1226,28 @@ export function CanvasBoardView({
       data-pan-x={Math.round(pan.x)}
       data-pan-y={Math.round(pan.y)}
       onPointerDown={handleStagePointerDown}
-      onPointerMove={handlePointerMove}
+      onPointerMove={(e) => {
+        const sr = stageRef.current?.getBoundingClientRect();
+        if (sr) {
+          lastStagePointerRef.current = {
+            x: e.clientX - sr.left,
+            y: e.clientY - sr.top,
+            inside: true,
+          };
+        }
+        handlePointerMove(e);
+      }}
+      onPointerLeave={() => {
+        lastStagePointerRef.current.inside = false;
+      }}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      onWheel={handleWheel}
     >
       <div
         className={`canvas-world ${smoothCamera ? "canvas-world--smooth" : ""}`}
         style={{
           transform: `translate3d(${Math.round(pan.x)}px, ${Math.round(pan.y)}px, 0) scale(${zoom})`,
+          transitionDuration: smoothCamera ? `${smoothDurationMs}ms` : undefined,
         }}
       >
         {items.map((item) => {

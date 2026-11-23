@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CloseIcon,
   CopyIcon,
@@ -31,6 +31,16 @@ import { FontQuickLookViewer } from "./FontQuickLookViewer";
 import { GifQuickLookViewer } from "./GifQuickLookViewer";
 import { Model3DQuickLookViewer } from "./Model3DQuickLookViewer";
 import { RichMediaCardContent } from "./RichMediaCardContent";
+import { VideoNonDestructiveEditor } from "./VideoNonDestructiveEditor";
+import {
+  buildVideoCssFilter,
+  hasNonDestructiveEdits,
+  type VideoEditRecipe,
+} from "./video-editor-engine";
+import {
+  stepQuickLookWheelNavigation,
+  type QuickLookWheelState,
+} from "./viewport-motion";
 
 export function getQuickLookStageDimensions(item: LibraryItem): {
   width: number;
@@ -66,7 +76,55 @@ export interface QuickLookLightboxProps {
   onUpdateNote: (id: string, note: string) => void;
   onTrashOrRestore: (id: string) => void;
   onPinToPip?: (item: LibraryItem) => void;
+  onUpdateVideoEdit?: (id: string, recipe: VideoEditRecipe | undefined) => void;
   onNotify: (message: string) => void;
+}
+
+const SLIDE_VARIANTS = {
+  enter: (dir: number) =>
+    dir === 0
+      ? { x: 0, opacity: 1, scale: 1 }
+      : { x: dir * 76, opacity: 0.22, scale: 0.975 },
+  center: { x: 0, opacity: 1, scale: 1 },
+  exit: (dir: number) =>
+    dir === 0
+      ? { x: 0, opacity: 1, scale: 1 }
+      : { x: -dir * 76, opacity: 0.16, scale: 0.975 },
+};
+
+function shouldYieldWheelToInnerElement(
+  target: EventTarget | null,
+  deltaY: number,
+): boolean {
+  const el = target instanceof HTMLElement ? target : null;
+  if (!el) return false;
+
+  // Let WebGL 3D OrbitControls, Inspector drawer, and 100% zoom scroller own wheel events
+  if (
+    el.closest(".ql-model3d-canvas-mount") ||
+    el.closest(".lightbox-inspector") ||
+    el.closest(".lightbox-actual-scroller")
+  ) {
+    return true;
+  }
+
+  // Let scrollable textareas or font waterfall/glyph panels scroll until they hit their boundary
+  const scrollable = el.closest<HTMLElement>(
+    "textarea, .ql-font-body, .ql-font-glyph-grid",
+  );
+  if (scrollable) {
+    const canScroll = scrollable.scrollHeight > scrollable.clientHeight + 4;
+    if (canScroll) {
+      const atTop = scrollable.scrollTop <= 1;
+      const atBottom =
+        scrollable.scrollTop + scrollable.clientHeight >=
+        scrollable.scrollHeight - 1;
+      if ((deltaY < 0 && !atTop) || (deltaY > 0 && !atBottom)) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export function QuickLookLightbox({
@@ -91,19 +149,39 @@ export function QuickLookLightbox({
   onUpdateNote,
   onTrashOrRestore,
   onPinToPip,
+  onUpdateVideoEdit,
   onNotify,
 }: QuickLookLightboxProps) {
   const m = useMemo(() => getMessages(locale), [locale]);
   const [actualSize, setActualSize] = useState(false);
   const [model3dReady, setModel3dReady] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [videoEditMode, setVideoEditMode] = useState(false);
   const [newTagInput, setNewTagInput] = useState("");
+  const [navDirection, setNavDirection] = useState<-1 | 0 | 1>(0);
+  const [swipeDragX, setSwipeDragX] = useState(0);
   const [viewport, setViewport] = useState(() => ({
     width: typeof window !== "undefined" ? window.innerWidth : 1440,
     height: typeof window !== "undefined" ? window.innerHeight : 900,
   }));
+
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const closeDoneRef = useRef(false);
   const veilPointerDownRef = useRef(false);
+  const wheelStateRef = useRef<QuickLookWheelState>({
+    accum: 0,
+    lastEventAt: 0,
+    cooldownUntil: 0,
+  });
+  const swipeRef = useRef<{
+    active: boolean;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    dx: number;
+    swiped: boolean;
+  } | null>(null);
+  const suppressNextHeroClickRef = useRef(false);
 
   const isClosing = phase === "closing";
   const isLanding = phase === "landing";
@@ -118,9 +196,23 @@ export function QuickLookLightbox({
   }, []);
 
   useEffect(() => {
+    if (!phase) {
+      setNavDirection(0);
+      setSwipeDragX(0);
+      setVideoEditMode(false);
+    } else if (phase !== "open") {
+      setNavDirection(0);
+      setSwipeDragX(0);
+      setVideoEditMode(false);
+    }
+  }, [phase]);
+
+  useEffect(() => {
     setActualSize(false);
     setModel3dReady(false);
+    setVideoEditMode(false);
     setNewTagInput("");
+    setSwipeDragX(0);
     if (item && phase === "open" && autoOpenInspector) {
       setInspectorOpen(true);
     }
@@ -154,6 +246,47 @@ export function QuickLookLightbox({
       ? items[currentIndex + 1]
       : null;
 
+  const navigateWithDirection = useCallback(
+    (targetId: string, dir: -1 | 1) => {
+      setNavDirection(dir);
+      setSwipeDragX(0);
+      onNavigate(targetId);
+    },
+    [onNavigate],
+  );
+
+  // Native non-passive wheel listener: scroll mouse wheel or trackpad horizontally/vertically
+  // while QuickLook is open to smoothly browse adjacent items (Atlas 00:05–00:06).
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !item || phase !== "open" || actualSize || videoEditMode) return;
+
+    const onNativeWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) return;
+      if (shouldYieldWheelToInnerElement(e.target, e.deltaY)) return;
+
+      e.preventDefault();
+      const step = stepQuickLookWheelNavigation(
+        wheelStateRef.current,
+        e.deltaX,
+        e.deltaY,
+        performance.now(),
+        Boolean(prevItem),
+        Boolean(nextItem),
+      );
+      wheelStateRef.current = step.nextState;
+
+      if (step.direction === 1 && nextItem) {
+        navigateWithDirection(nextItem.id, 1);
+      } else if (step.direction === -1 && prevItem) {
+        navigateWithDirection(prevItem.id, -1);
+      }
+    };
+
+    root.addEventListener("wheel", onNativeWheel, { passive: false });
+    return () => root.removeEventListener("wheel", onNativeWheel);
+  }, [item, phase, actualSize, videoEditMode, prevItem, nextItem, navigateWithDirection]);
+
   const targetRect = useMemo(() => {
     if (!item) return null;
     const dims = getQuickLookStageDimensions(item);
@@ -167,7 +300,7 @@ export function QuickLookLightbox({
   }, [item, viewport.width, viewport.height, inspectorOpen, isReturning]);
 
   useEffect(() => {
-    if (!item || isReturning) return;
+    if (!item || isReturning || videoEditMode) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const isEditing =
@@ -188,10 +321,10 @@ export function QuickLookLightbox({
         onRequestClose();
       } else if (e.key === "ArrowLeft" && prevItem) {
         e.preventDefault();
-        onNavigate(prevItem.id);
+        navigateWithDirection(prevItem.id, -1);
       } else if (e.key === "ArrowRight" && nextItem) {
         e.preventDefault();
-        onNavigate(nextItem.id);
+        navigateWithDirection(nextItem.id, 1);
       } else if (e.key.toLowerCase() === "i") {
         e.preventDefault();
         setInspectorOpen((v) => !v);
@@ -203,7 +336,16 @@ export function QuickLookLightbox({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [item, isReturning, prevItem, nextItem, onRequestClose, onNavigate, onToggleLike]);
+  }, [
+    item,
+    isReturning,
+    videoEditMode,
+    prevItem,
+    nextItem,
+    onRequestClose,
+    navigateWithDirection,
+    onToggleLike,
+  ]);
 
   if (!item || !targetRect || !phase) return null;
 
@@ -241,7 +383,9 @@ export function QuickLookLightbox({
 
   const startRect = originRect ?? fallbackCenterRect;
   const resolvedReturnRect = returnRect ?? originRect;
-  const endRect = isReturning ? (resolvedReturnRect ?? fallbackCenterRect) : targetRect;
+  const endRect = isReturning
+    ? (resolvedReturnRect ?? fallbackCenterRect)
+    : targetRect;
   const isFadingOutFallback = isReturning && !resolvedReturnRect;
   const activeDuration = isLanding
     ? 0
@@ -249,6 +393,7 @@ export function QuickLookLightbox({
       speedMultiplier;
 
   const isRich = isRichInteractiveKind(item.kind);
+  const canSwipeHero = !isReturning && !isRich && item.kind !== "video";
   const frameSurfaceColor = getQuickLookFrameSurfaceColor(
     {
       kind: item.kind,
@@ -265,12 +410,68 @@ export function QuickLookLightbox({
   const studioReady = item.kind === "model3d" ? model3dReady : true;
   const showStudio = !isReturning && studioReady;
 
+  const handleHeroPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!canSwipeHero || e.button !== 0) return;
+    swipeRef.current = {
+      active: true,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      dx: 0,
+      swiped: false,
+    };
+  };
+
+  const handleHeroPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const sw = swipeRef.current;
+    if (!sw || !sw.active) return;
+    const dx = e.clientX - sw.startX;
+    const dy = e.clientY - sw.startY;
+    if (!sw.swiped && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+      sw.swiped = true;
+      try {
+        e.currentTarget.setPointerCapture(sw.pointerId);
+      } catch {
+        // Ignore capture failure
+      }
+    }
+    if (!sw.swiped) return;
+    const atEdge = (dx > 0 && !prevItem) || (dx < 0 && !nextItem);
+    const damped = atEdge ? dx * 0.24 : Math.max(-180, Math.min(180, dx * 0.65));
+    sw.dx = dx;
+    setSwipeDragX(damped);
+  };
+
+  const handleHeroPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const sw = swipeRef.current;
+    if (!sw || !sw.active) return;
+    sw.active = false;
+    swipeRef.current = null;
+    if (sw.swiped) {
+      suppressNextHeroClickRef.current = true;
+      try {
+        e.currentTarget.releasePointerCapture(sw.pointerId);
+      } catch {
+        // Ignore capture release failure
+      }
+      if (sw.dx <= -62 && nextItem) {
+        navigateWithDirection(nextItem.id, 1);
+      } else if (sw.dx >= 62 && prevItem) {
+        navigateWithDirection(prevItem.id, -1);
+      } else {
+        setSwipeDragX(0);
+      }
+    }
+  };
+
   return (
     <div
+      ref={rootRef}
       className="lightbox-root"
       data-testid="quicklook-lightbox"
       data-closing={isReturning ? "true" : "false"}
       data-phase={phase}
+      data-item-id={item.id}
       style={{ pointerEvents: isReturning ? "none" : undefined }}
     >
       {/* Translucent Light/Dark Veil synchronized frame-for-frame with Hero & Radial Neighbor Push-Out */}
@@ -346,6 +547,37 @@ export function QuickLookLightbox({
         </div>
 
         <div className="topbar-right">
+          {item.kind === "video" && (
+            <button
+              type="button"
+              className={`ql-topbar-edit-pill ${hasNonDestructiveEdits(item.videoEdit, item) ? "ql-topbar-edit-pill--edited" : ""}`}
+              data-testid="ql-topbar-edit-video-btn"
+              onClick={() => setVideoEditMode(true)}
+              title={m.videoEditBtn}
+              aria-label={m.videoEditBtn}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2.5 5h11M2.5 11h11" />
+                <circle cx="6" cy="5" r="1.8" fill="currentColor" stroke="none" />
+                <circle cx="10.5" cy="11" r="1.8" fill="currentColor" stroke="none" />
+              </svg>
+              <span>{m.videoEditBtn}</span>
+              {hasNonDestructiveEdits(item.videoEdit, item) && (
+                <span className="ql-video-edited-dot" aria-hidden="true" />
+              )}
+            </button>
+          )}
+
           <button
             type="button"
             className={`topbar-icon-btn ${inspectorOpen ? "topbar-icon-btn--active" : ""}`}
@@ -413,7 +645,7 @@ export function QuickLookLightbox({
             boxShadow: "0 8px 24px rgba(0, 0, 0, 0.1)",
           }}
           animate={{
-            x: endRect.left,
+            x: endRect.left + (isReturning ? 0 : swipeDragX),
             y: endRect.top,
             width: endRect.width,
             height: endRect.height,
@@ -430,7 +662,7 @@ export function QuickLookLightbox({
                 : "0 22px 60px rgba(0, 0, 0, 0.16)",
           }}
           transition={{
-            duration: activeDuration,
+            duration: swipeDragX !== 0 ? 0.04 : activeDuration,
             ease: HERO_MOTION_EASE,
           }}
           onAnimationComplete={() => {
@@ -439,109 +671,147 @@ export function QuickLookLightbox({
               onCloseComplete();
             }
           }}
+          onPointerDown={handleHeroPointerDown}
+          onPointerMove={handleHeroPointerMove}
+          onPointerUp={handleHeroPointerUp}
+          onPointerCancel={handleHeroPointerUp}
           onClick={(e) => {
             e.stopPropagation();
+            if (suppressNextHeroClickRef.current) {
+              suppressNextHeroClickRef.current = false;
+              return;
+            }
             if (!isReturning && !isRich && item.kind !== "video") {
               setActualSize(true);
             }
           }}
         >
-          {item.kind === "video" ? (
-            !isReturning ? (
-              <VideoQuickLookStage
-                item={item}
-                locale={locale}
-                onPinToPip={(targetItem) => {
-                  onPinToPip?.(targetItem);
-                }}
-              />
-            ) : (
-              <img
-                src={item.src}
-                alt={item.title}
-                className="lightbox-hero-img"
-                draggable={false}
-              />
-            )
-          ) : isRich ? (
-            <>
-              {/* Layer A: Continuous Card Snapshot (cross-dissolves seamlessly out on open & back in on close) */}
-              <motion.div
-                className="hero-morph-layer hero-morph-layer--card"
-                data-testid="hero-morph-card-layer"
-                initial={{ opacity: 1, scale: 1 }}
-                animate={{
-                  opacity: showStudio ? 0 : 1,
-                  scale: showStudio ? 1.03 : 1,
-                }}
-                transition={{
-                  duration: isLanding
-                    ? 0
-                    : (showStudio ? 0.24 : 0.19) * speedMultiplier,
-                  delay: isLanding
-                    ? 0
-                    : (showStudio ? 0.04 : 0.045) * speedMultiplier,
-                  ease: HERO_MOTION_EASE,
-                }}
-                style={{ pointerEvents: showStudio ? "none" : "auto" }}
-                aria-hidden={showStudio}
-              >
-                <RichMediaCardContent
-                  item={item}
-                  theme={theme}
-                  interactiveAudio={false}
-                />
-              </motion.div>
-
-              {/* Layer B: Detailed Studio (mounted immediately on frame 0 — zero 380ms pop-in snap!) */}
-              {!isLanding && (
-                <motion.div
-                  className="hero-morph-layer hero-morph-layer--studio"
-                  data-testid="hero-morph-studio-layer"
-                  initial={{ opacity: 0, scale: 0.968, y: 10 }}
-                  animate={{
-                    opacity: showStudio ? 1 : 0,
-                    scale: showStudio ? 1 : 0.968,
-                    y: showStudio ? 0 : 8,
-                  }}
-                  transition={{
-                    duration: (showStudio ? 0.28 : 0.15) * speedMultiplier,
-                    delay: showStudio ? 0.045 * speedMultiplier : 0,
-                    ease: HERO_MOTION_EASE,
-                  }}
-                  style={{ pointerEvents: showStudio ? "auto" : "none" }}
-                >
-                  {item.kind === "audio" && item.audioMeta ? (
-                    <AudioQuickLookPlayer item={item} locale={locale} />
-                  ) : item.kind === "model3d" && item.modelMeta ? (
-                    <Model3DQuickLookViewer
+          <AnimatePresence
+            mode="popLayout"
+            custom={isReturning ? 0 : navDirection}
+            initial={false}
+          >
+            <motion.div
+              key={item.id}
+              className="hero-slide-slot"
+              custom={isReturning ? 0 : navDirection}
+              variants={SLIDE_VARIANTS}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{
+                duration: isReturning ? 0 : 0.28 * speedMultiplier,
+                ease: HERO_MOTION_EASE,
+              }}
+            >
+              {item.kind === "video" ? (
+                !isReturning && !videoEditMode ? (
+                  <VideoQuickLookStage
+                    item={item}
+                    locale={locale}
+                    onEnterEdit={() => setVideoEditMode(true)}
+                    onPinToPip={(targetItem) => {
+                      onPinToPip?.(targetItem);
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={item.src}
+                    alt={item.title}
+                    className="lightbox-hero-img"
+                    style={{
+                      filter: item.videoEdit
+                        ? buildVideoCssFilter(item.videoEdit.grade)
+                        : undefined,
+                    }}
+                    draggable={false}
+                  />
+                )
+              ) : isRich ? (
+                <>
+                  {/* Layer A: Continuous Card Snapshot (cross-dissolves seamlessly out on open & back in on close) */}
+                  <motion.div
+                    className="hero-morph-layer hero-morph-layer--card"
+                    data-testid="hero-morph-card-layer"
+                    initial={{ opacity: 1, scale: 1 }}
+                    animate={{
+                      opacity: showStudio ? 0 : 1,
+                      scale: showStudio ? 1.03 : 1,
+                    }}
+                    transition={{
+                      duration: isLanding
+                        ? 0
+                        : (showStudio ? 0.24 : 0.19) * speedMultiplier,
+                      delay: isLanding
+                        ? 0
+                        : (showStudio ? 0.04 : 0.045) * speedMultiplier,
+                      ease: HERO_MOTION_EASE,
+                    }}
+                    style={{ pointerEvents: showStudio ? "none" : "auto" }}
+                    aria-hidden={showStudio}
+                  >
+                    <RichMediaCardContent
                       item={item}
                       theme={theme}
-                      locale={locale}
-                      targetWidth={targetRect.width}
-                      targetHeight={targetRect.height}
-                      onFirstFrameReady={() => setModel3dReady(true)}
+                      interactiveAudio={false}
                     />
-                  ) : item.kind === "font" && item.fontMeta ? (
-                    <FontQuickLookViewer
-                      item={item}
-                      locale={locale}
-                      onNotify={onNotify}
-                    />
-                  ) : item.kind === "gif" && item.gifMeta ? (
-                    <GifQuickLookViewer item={item} theme={theme} locale={locale} />
-                  ) : null}
-                </motion.div>
+                  </motion.div>
+
+                  {/* Layer B: Detailed Studio (mounted immediately on frame 0 — zero 380ms pop-in snap!) */}
+                  {!isLanding && (
+                    <motion.div
+                      className="hero-morph-layer hero-morph-layer--studio"
+                      data-testid="hero-morph-studio-layer"
+                      initial={{ opacity: 0, scale: 0.968, y: 10 }}
+                      animate={{
+                        opacity: showStudio ? 1 : 0,
+                        scale: showStudio ? 1 : 0.968,
+                        y: showStudio ? 0 : 8,
+                      }}
+                      transition={{
+                        duration: (showStudio ? 0.28 : 0.15) * speedMultiplier,
+                        delay: showStudio ? 0.045 * speedMultiplier : 0,
+                        ease: HERO_MOTION_EASE,
+                      }}
+                      style={{ pointerEvents: showStudio ? "auto" : "none" }}
+                    >
+                      {item.kind === "audio" && item.audioMeta ? (
+                        <AudioQuickLookPlayer item={item} locale={locale} />
+                      ) : item.kind === "model3d" && item.modelMeta ? (
+                        <Model3DQuickLookViewer
+                          item={item}
+                          theme={theme}
+                          locale={locale}
+                          targetWidth={targetRect.width}
+                          targetHeight={targetRect.height}
+                          onFirstFrameReady={() => setModel3dReady(true)}
+                        />
+                      ) : item.kind === "font" && item.fontMeta ? (
+                        <FontQuickLookViewer
+                          item={item}
+                          locale={locale}
+                          onNotify={onNotify}
+                        />
+                      ) : item.kind === "gif" && item.gifMeta ? (
+                        <GifQuickLookViewer
+                          item={item}
+                          theme={theme}
+                          locale={locale}
+                        />
+                      ) : null}
+                    </motion.div>
+                  )}
+                </>
+              ) : (
+                <img
+                  src={item.src}
+                  alt={item.title}
+                  className="lightbox-hero-img"
+                  draggable={false}
+                />
               )}
-            </>
-          ) : (
-            <img
-              src={item.src}
-              alt={item.title}
-              className="lightbox-hero-img"
-              draggable={false}
-            />
-          )}
+            </motion.div>
+          </AnimatePresence>
         </motion.div>
       ) : (
         <div
@@ -568,10 +838,11 @@ export function QuickLookLightbox({
         <motion.button
           type="button"
           className="lightbox-nav-btn lightbox-nav-btn--prev"
+          data-testid="lightbox-prev-btn"
           initial={{ opacity: 0, x: -6 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.2, delay: 0.08 }}
-          onClick={() => onNavigate(prevItem.id)}
+          onClick={() => navigateWithDirection(prevItem.id, -1)}
           aria-label="Previous item"
         >
           ‹
@@ -582,11 +853,12 @@ export function QuickLookLightbox({
         <motion.button
           type="button"
           className="lightbox-nav-btn lightbox-nav-btn--next"
+          data-testid="lightbox-next-btn"
           style={{ right: inspectorOpen ? 292 : 16 }}
           initial={{ opacity: 0, x: 6 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.2, delay: 0.08 }}
-          onClick={() => onNavigate(nextItem.id)}
+          onClick={() => navigateWithDirection(nextItem.id, 1)}
           aria-label="Next item"
         >
           ›
@@ -695,7 +967,7 @@ export function QuickLookLightbox({
         )}
       </AnimatePresence>
 
-      {/* Bottom-Right Auto / Copy / Export Frosted Pill */}
+      {/* Bottom-Right Index / Auto / Copy / Export Frosted Pill */}
       <motion.div
         className="lightbox-bottom-dock"
         style={{ right: inspectorOpen && !isReturning ? 296 : 20 }}
@@ -708,6 +980,14 @@ export function QuickLookLightbox({
         }}
       >
         <div className="dock-pill">
+          {items.length > 1 && currentIndex >= 0 && (
+            <>
+              <span className="dock-counter" data-testid="lightbox-item-counter">
+                {currentIndex + 1} / {items.length}
+              </span>
+              <span className="dock-sep" />
+            </>
+          )}
           {!isRich && item.kind !== "video" && (
             <>
               <button
@@ -741,6 +1021,22 @@ export function QuickLookLightbox({
           </button>
         </div>
       </motion.div>
+      {/* Full-Viewport Non-Destructive Video Editor Studio */}
+      <AnimatePresence>
+        {videoEditMode && item.kind === "video" && !isReturning && (
+          <VideoNonDestructiveEditor
+            item={item}
+            libraryItems={items}
+            theme={theme}
+            locale={locale}
+            onSaveRecipe={(itemId, nextRecipe) => {
+              onUpdateVideoEdit?.(itemId, nextRecipe);
+            }}
+            onClose={() => setVideoEditMode(false)}
+            onNotify={onNotify}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
