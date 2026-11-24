@@ -59,6 +59,7 @@ class AtomicMediaPlayerManager {
   private listeners = new Set<Listener>();
   private messageBound = false;
   private version = 0;
+  private notifyScheduled = false;
 
   private ensureParking(): HTMLDivElement {
     if (this.parkingEl && this.parkingEl.isConnected) {
@@ -91,12 +92,24 @@ class AtomicMediaPlayerManager {
       }
       const entry = this.entries.get(data.itemId);
       if (!entry) return;
+      const nextPlaying = Boolean(data.playing);
+      const nextElapsed = typeof data.elapsed === "number" ? data.elapsed : entry.state.elapsed;
+      const nextDuration = typeof data.duration === "number" ? data.duration : entry.state.duration;
+      const nextSession = typeof data.sessionId === "string" ? data.sessionId : entry.state.sessionId;
+      if (
+        entry.state.playing === nextPlaying &&
+        Math.abs(entry.state.elapsed - nextElapsed) < 0.01 &&
+        entry.state.duration === nextDuration &&
+        entry.state.sessionId === nextSession
+      ) {
+        return;
+      }
       entry.state = {
         ...entry.state,
-        playing: Boolean(data.playing),
-        elapsed: typeof data.elapsed === "number" ? data.elapsed : entry.state.elapsed,
-        duration: typeof data.duration === "number" ? data.duration : entry.state.duration,
-        sessionId: typeof data.sessionId === "string" ? data.sessionId : entry.state.sessionId,
+        playing: nextPlaying,
+        elapsed: nextElapsed,
+        duration: nextDuration,
+        sessionId: nextSession,
       };
       this.notify();
     });
@@ -104,9 +117,14 @@ class AtomicMediaPlayerManager {
 
   private notify(): void {
     this.version += 1;
-    for (const fn of this.listeners) {
-      fn();
-    }
+    if (this.notifyScheduled) return;
+    this.notifyScheduled = true;
+    queueMicrotask(() => {
+      this.notifyScheduled = false;
+      for (const fn of this.listeners) {
+        fn();
+      }
+    });
   }
 
   subscribe(fn: Listener): () => void {
@@ -296,29 +314,52 @@ class AtomicMediaPlayerManager {
         if (entry.videoEl.paused) entry.videoEl.play().catch(() => {});
         else entry.videoEl.pause();
       } else if (action === "seek" && typeof time === "number") {
-        entry.videoEl.currentTime = Math.max(0, Math.min(entry.state.duration, time));
+        const clamped = Math.max(0, Math.min(entry.state.duration, time));
+        if (Math.abs(entry.videoEl.currentTime - clamped) > 0.01) {
+          entry.videoEl.currentTime = clamped;
+        }
+      }
+      const nextPlaying = !entry.videoEl.paused;
+      const nextElapsed = entry.videoEl.currentTime;
+      if (
+        entry.state.playing === nextPlaying &&
+        Math.abs(entry.state.elapsed - nextElapsed) < 0.01
+      ) {
+        return;
       }
       entry.state = {
         ...entry.state,
-        playing: !entry.videoEl.paused,
-        elapsed: entry.videoEl.currentTime,
+        playing: nextPlaying,
+        elapsed: nextElapsed,
       };
       this.notify();
       return;
     }
 
+    let nextPlaying = entry.state.playing;
+    let nextElapsed = entry.state.elapsed;
     if (action === "play") {
-      entry.state = { ...entry.state, playing: true };
+      nextPlaying = true;
     } else if (action === "pause") {
-      entry.state = { ...entry.state, playing: false };
+      nextPlaying = false;
     } else if (action === "toggle") {
-      entry.state = { ...entry.state, playing: !entry.state.playing };
+      nextPlaying = !entry.state.playing;
     } else if (action === "seek" && typeof time === "number") {
-      entry.state = {
-        ...entry.state,
-        elapsed: Math.max(0, Math.min(entry.state.duration, time)),
-      };
+      nextElapsed = Math.max(0, Math.min(entry.state.duration, time));
     }
+
+    if (
+      entry.state.playing === nextPlaying &&
+      Math.abs(entry.state.elapsed - nextElapsed) < 0.01
+    ) {
+      return;
+    }
+
+    entry.state = {
+      ...entry.state,
+      playing: nextPlaying,
+      elapsed: nextElapsed,
+    };
 
     try {
       entry.iframe?.contentWindow?.postMessage(

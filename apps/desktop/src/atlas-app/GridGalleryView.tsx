@@ -205,8 +205,16 @@ export function GridGalleryView({
     if (!el) return;
     const r = el.getBoundingClientRect();
     const nextW = Math.floor(el.clientWidth);
-    if (nextW > 120) setContentWidth(nextW);
-    setContentOrigin({ left: r.left, top: r.top });
+    if (nextW > 120) {
+      setContentWidth((prev) => (prev === nextW ? prev : nextW));
+    }
+    const nextLeft = Math.round(r.left * 2) / 2;
+    const nextTop = Math.round(r.top * 2) / 2;
+    setContentOrigin((prev) =>
+      Math.abs(prev.left - nextLeft) < 0.5 && Math.abs(prev.top - nextTop) < 0.5
+        ? prev
+        : { left: nextLeft, top: nextTop },
+    );
   }, []);
 
   useEffect(() => {
@@ -1083,6 +1091,11 @@ export function GridGalleryView({
     });
   };
 
+  const activeDraggedSet = useMemo(() => {
+    if (!dragSession) return new Set<string>();
+    return new Set(dragSession.items.map((it) => it.id));
+  }, [dragSession]);
+
   if (items.length === 0) {
     return (
       <div className="atlas-empty">
@@ -1095,10 +1108,6 @@ export function GridGalleryView({
   const imgFit = layoutMode === "fit" ? "contain" : "cover";
   const isHeroSession = heroPush.heroKey !== null;
   const isZoomSyncFrame = prevZoomRef.current !== zoom;
-  const activeDraggedSet = useMemo(() => {
-    if (!dragSession) return new Set<string>();
-    return new Set(dragSession.items.map((it) => it.id));
-  }, [dragSession]);
   const showDropSlotPlaceholder =
     dragSession?.phase === "dragging" &&
     !dragSession.outOfBounds &&

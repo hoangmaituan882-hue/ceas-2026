@@ -309,6 +309,11 @@ export function VideoNonDestructiveEditor({
   const rulerAreaRef = useRef<HTMLDivElement | null>(null);
   const scrubRef = useRef<HTMLDivElement | null>(null);
 
+  const undoStackRef = useRef(undoStack);
+  undoStackRef.current = undoStack;
+  const redoStackRef = useRef(redoStack);
+  redoStackRef.current = redoStack;
+
   const pushHistorySnapshot = useCallback((snapshot?: VideoEditRecipe) => {
     const base = snapshot ?? recipeRef.current;
     setUndoStack((prev) => [...prev.slice(-29), base]);
@@ -317,37 +322,39 @@ export function VideoNonDestructiveEditor({
 
   const commitRecipeChange = useCallback(
     (updater: (prev: VideoEditRecipe) => VideoEditRecipe, recordHistory = true) => {
-      setRecipe((prev) => {
-        const next = updater(prev);
-        if (next === prev) return prev;
-        if (recordHistory) {
-          setUndoStack((u) => [...u.slice(-29), prev]);
-          setRedoStack([]);
-        }
-        return next;
-      });
+      const prev = recipeRef.current;
+      const next = updater(prev);
+      if (next === prev) return;
+      recipeRef.current = next;
+      setRecipe(next);
+      if (recordHistory) {
+        setUndoStack((u) => [...u.slice(-29), prev]);
+        setRedoStack([]);
+      }
     },
     [],
   );
 
   const handleUndo = useCallback(() => {
-    setUndoStack((prev) => {
-      if (prev.length === 0) return prev;
-      const last = prev[prev.length - 1]!;
-      setRedoStack((r) => [...r.slice(-29), recipeRef.current]);
-      setRecipe(last);
-      return prev.slice(0, -1);
-    });
+    const stack = undoStackRef.current;
+    if (stack.length === 0) return;
+    const last = stack[stack.length - 1]!;
+    const current = recipeRef.current;
+    recipeRef.current = last;
+    setUndoStack(stack.slice(0, -1));
+    setRedoStack((r) => [...r.slice(-29), current]);
+    setRecipe(last);
   }, []);
 
   const handleRedo = useCallback(() => {
-    setRedoStack((prev) => {
-      if (prev.length === 0) return prev;
-      const next = prev[prev.length - 1]!;
-      setUndoStack((u) => [...u.slice(-29), recipeRef.current]);
-      setRecipe(next);
-      return prev.slice(0, -1);
-    });
+    const stack = redoStackRef.current;
+    if (stack.length === 0) return;
+    const next = stack[stack.length - 1]!;
+    const current = recipeRef.current;
+    recipeRef.current = next;
+    setRedoStack(stack.slice(0, -1));
+    setUndoStack((u) => [...u.slice(-29), current]);
+    setRecipe(next);
   }, []);
 
   const activeResolution = useMemo(

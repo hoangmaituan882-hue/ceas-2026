@@ -479,4 +479,33 @@ export function GifMotionIcon({ size = 15 }: { size?: number }) {
   );
 }
 
+export function MagicWandIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <rect
+        x="3.3"
+        y="7.1"
+        width="12.2"
+        height="3.4"
+        rx="1.7"
+        transform="rotate(45 9.4 8.8)"
+        stroke="currentColor"
+        strokeWidth="1.35"
+      />
+      <path
+        d="M6.9 6.3L9.3 8.7"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.2 2.4L13.65 3.65L14.9 4.1L13.65 4.55L13.2 5.8L12.75 4.55L11.5 4.1L12.75 3.65L13.2 2.4Z"
+        fill="currentColor"
+      />
+      <circle cx="4.3" cy="12.5" r="0.9" fill="currentColor" />
+    </svg>
+  );
+}
+
+
 

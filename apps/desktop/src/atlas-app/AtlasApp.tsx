@@ -855,6 +855,14 @@ export function AtlasApp() {
     );
   };
 
+  const handleUpdateTitle = (id: string, title: string) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    setItems((prev) =>
+      prev.map((it) => (it.id === id ? { ...it, title: trimmed } : it)),
+    );
+  };
+
   const handleCanvasMoveItems = useCallback(
     (updates: readonly { id: string; x: number; y: number; w?: number }[]) => {
       if (updates.length === 0) return;
@@ -1796,6 +1804,7 @@ export function AtlasApp() {
         speedMultiplier={speedMultiplier}
         autoOpenInspector={settings.autoOpenInspector}
         items={filteredItems}
+        allItems={items}
         collections={collections}
         onRequestClose={requestCloseQuickLook}
         onCloseComplete={beginLandingQuickLook}
@@ -1812,6 +1821,7 @@ export function AtlasApp() {
           })
         }
         onToggleLike={handleToggleLike}
+        onUpdateTitle={handleUpdateTitle}
         onUpdateCollection={handleMoveToCollection}
         onAddTagToItem={handleAddTagToItem}
         onRemoveTagFromItem={handleRemoveTagFromItem}

@@ -583,6 +583,17 @@ export function StorageDiskAnalyzer({
     [computeLiveSegments, snapshot.totalCapacityGb, theme],
   );
 
+  const onClearCachesRef = useRef(onClearCaches);
+  onClearCachesRef.current = onClearCaches;
+  const onEmptyTrashRef = useRef(onEmptyTrash);
+  onEmptyTrashRef.current = onEmptyTrash;
+  const computeLiveSegmentsRef = useRef(computeLiveSegments);
+  computeLiveSegmentsRef.current = computeLiveSegments;
+  const paintCanvasRef = useRef(paintCanvas);
+  paintCanvasRef.current = paintCanvas;
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+
   // Unified smart animation loop — wakes up on scan/clear/hover/decay, sleeps at 0% CPU when settled!
   const ensureAnimLoop = useCallback(() => {
     if (rafRef.current !== null) return;
@@ -618,7 +629,7 @@ export function StorageDiskAnalyzer({
           Math.floor(linear * SCAN_DIRECTORY_STEPS.length),
         );
         setScanTick({ progress: eased, pathIndex: pathIdx });
-        paintCanvas(now, eased, true, null, 0);
+        paintCanvasRef.current(now, eased, true, null, 0);
 
         if (linear >= 1) {
           phaseRef.current = "idle";
@@ -635,10 +646,10 @@ export function StorageDiskAnalyzer({
         setClearingProgress(clearFrac);
 
         // Emit crisp square pixel particles from the eroding right edge
-        const liveSegs = computeLiveSegments(clearCat, clearFrac);
+        const liveSegs = computeLiveSegmentsRef.current(clearCat, clearFrac);
         const liveRanges = computeMatrixColumnLayout(
           liveSegs,
-          snapshot.totalCapacityGb,
+          snapshotRef.current.totalCapacityGb,
           MATRIX_COLS,
         );
         const erodingRange = clearCat
@@ -668,20 +679,20 @@ export function StorageDiskAnalyzer({
           }
         }
 
-        paintCanvas(now, 1, false, clearCat, clearFrac);
+        paintCanvasRef.current(now, 1, false, clearCat, clearFrac);
 
         if (clearFrac >= 1 && particlesRef.current.length === 0) {
           const freed = clearingInitialGbRef.current;
-          const nextAvail = Math.round((snapshot.availableGb + freed) * 10) / 10;
+          const nextAvail = Math.round((snapshotRef.current.availableGb + freed) * 10) / 10;
           setFreedBanner({ freedGb: freed, availableGb: nextAvail });
           setClearingProgress(0);
           clearingCategoryRef.current = null;
           phaseRef.current = "idle";
           setPhase("idle");
           if (clearCat === "caches") {
-            onClearCaches(freed);
+            onClearCachesRef.current(freed);
           } else if (clearCat === "trash") {
-            onEmptyTrash(freed);
+            onEmptyTrashRef.current(freed);
           }
           rafRef.current = null;
           return;
@@ -703,7 +714,7 @@ export function StorageDiskAnalyzer({
         waveStateRef.current.id !== null &&
         now - waveStateRef.current.startedAt < WAVE_DURATION_MS + 60;
 
-      paintCanvas(now, 1, false, null, 0);
+      paintCanvasRef.current(now, 1, false, null, 0);
 
       // Keep running while hovered (living pixel twinkle!), while focus is decaying, or while particles/wave exist
       const keepAlive =
@@ -720,14 +731,7 @@ export function StorageDiskAnalyzer({
     };
 
     rafRef.current = requestAnimationFrame(tick);
-  }, [
-    computeLiveSegments,
-    onClearCaches,
-    onEmptyTrash,
-    paintCanvas,
-    snapshot.availableGb,
-    snapshot.totalCapacityGb,
-  ]);
+  }, []);
 
   // Kick off initial scan on mount & clean up rAF on unmount
   useEffect(() => {

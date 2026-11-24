@@ -283,30 +283,43 @@ export function RichMediaCardContent({
         }}
       >
         <div className="rich-audio-top">
-          <button
-            type="button"
-            className="rich-audio-play-btn"
-            data-testid={`card-audio-play-${item.id}`}
-            aria-label={isPlaying ? "Pause audio" : "Play audio"}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (interactiveAudio) {
+          {interactiveAudio ? (
+            <button
+              type="button"
+              className="rich-audio-play-btn"
+              data-testid={`card-audio-play-${item.id}`}
+              aria-label={isPlaying ? "Pause audio" : "Play audio"}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
                 atlasAudioEngine.toggle(item.id, meta);
-              }
-            }}
-          >
-            {isPlaying ? (
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
-                <rect x="2" y="1.5" width="3" height="9" rx="0.8" />
-                <rect x="7" y="1.5" width="3" height="9" rx="0.8" />
-              </svg>
-            ) : (
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
-                <path d="M3 1.7L10.3 6L3 10.3V1.7Z" />
-              </svg>
-            )}
-          </button>
+              }}
+            >
+              {isPlaying ? (
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                  <rect x="2" y="1.5" width="3" height="9" rx="0.8" />
+                  <rect x="7" y="1.5" width="3" height="9" rx="0.8" />
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                  <path d="M3 1.7L10.3 6L3 10.3V1.7Z" />
+                </svg>
+              )}
+            </button>
+          ) : (
+            <span className="rich-audio-play-btn" aria-hidden="true">
+              {isPlaying ? (
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                  <rect x="2" y="1.5" width="3" height="9" rx="0.8" />
+                  <rect x="7" y="1.5" width="3" height="9" rx="0.8" />
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                  <path d="M3 1.7L10.3 6L3 10.3V1.7Z" />
+                </svg>
+              )}
+            </span>
+          )}
           <span className="rich-audio-meta-top">
             {meta.format} · {isActiveTrack ? formatAudioTime(audioSnap.currentTime) : formatAudioTime(meta.durationSec)}
           </span>

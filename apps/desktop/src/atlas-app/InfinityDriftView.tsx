@@ -114,10 +114,13 @@ export function InfinityDriftView({
     const el = stageRef.current;
     if (!el) return;
     const measure = () => {
-      setViewport({
-        width: Math.max(320, el.clientWidth),
-        height: Math.max(320, el.clientHeight),
-      });
+      const nextW = Math.max(320, el.clientWidth);
+      const nextH = Math.max(320, el.clientHeight);
+      setViewport((prev) =>
+        prev.width === nextW && prev.height === nextH
+          ? prev
+          : { width: nextW, height: nextH },
+      );
     };
     measure();
     const ro = new ResizeObserver(measure);

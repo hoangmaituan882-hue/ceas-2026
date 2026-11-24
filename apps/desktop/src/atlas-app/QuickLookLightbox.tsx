@@ -30,6 +30,7 @@ import { VideoQuickLookStage } from "./AtomicMediaPlayerHost";
 import { FontQuickLookViewer } from "./FontQuickLookViewer";
 import { GifQuickLookViewer } from "./GifQuickLookViewer";
 import { Model3DQuickLookViewer } from "./Model3DQuickLookViewer";
+import { QuickLookInspectorPanel } from "./QuickLookInspectorPanel";
 import { RichMediaCardContent } from "./RichMediaCardContent";
 import { VideoNonDestructiveEditor } from "./VideoNonDestructiveEditor";
 import {
@@ -65,11 +66,13 @@ export interface QuickLookLightboxProps {
   speedMultiplier: number;
   autoOpenInspector: boolean;
   items: readonly LibraryItem[];
+  allItems?: readonly LibraryItem[];
   collections: readonly CollectionItem[];
   onRequestClose: () => void;
   onCloseComplete: () => void;
   onNavigate: (id: string) => void;
   onToggleLike: (id: string) => void;
+  onUpdateTitle?: (id: string, title: string) => void;
   onUpdateCollection: (id: string, collectionId: string | null) => void;
   onAddTagToItem: (id: string, tag: string) => void;
   onRemoveTagFromItem: (id: string, tag: string) => void;
@@ -138,11 +141,13 @@ export function QuickLookLightbox({
   speedMultiplier,
   autoOpenInspector,
   items,
+  allItems,
   collections,
   onRequestClose,
   onCloseComplete,
   onNavigate,
   onToggleLike,
+  onUpdateTitle,
   onUpdateCollection,
   onAddTagToItem,
   onRemoveTagFromItem,
@@ -157,7 +162,6 @@ export function QuickLookLightbox({
   const [model3dReady, setModel3dReady] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [videoEditMode, setVideoEditMode] = useState(false);
-  const [newTagInput, setNewTagInput] = useState("");
   const [navDirection, setNavDirection] = useState<-1 | 0 | 1>(0);
   const [swipeDragX, setSwipeDragX] = useState(0);
   const [viewport, setViewport] = useState(() => ({
@@ -189,7 +193,13 @@ export function QuickLookLightbox({
 
   useEffect(() => {
     const onResize = () => {
-      setViewport({ width: window.innerWidth, height: window.innerHeight });
+      const nextW = window.innerWidth;
+      const nextH = window.innerHeight;
+      setViewport((prev) =>
+        prev.width === nextW && prev.height === nextH
+          ? prev
+          : { width: nextW, height: nextH },
+      );
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -211,7 +221,6 @@ export function QuickLookLightbox({
     setActualSize(false);
     setModel3dReady(false);
     setVideoEditMode(false);
-    setNewTagInput("");
     setSwipeDragX(0);
     if (item && phase === "open" && autoOpenInspector) {
       setInspectorOpen(true);
@@ -364,14 +373,6 @@ export function QuickLookLightbox({
     link.download = item.filename;
     link.click();
     onNotify(`Exporting ${item.filename}`);
-  };
-
-  const handleTagFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleaned = newTagInput.trim().replace(/^#+/, "");
-    if (!cleaned) return;
-    onAddTagToItem(item.id, cleaned);
-    setNewTagInput("");
   };
 
   const fallbackCenterRect: ScreenRect = {
@@ -816,7 +817,7 @@ export function QuickLookLightbox({
       ) : (
         <div
           className="lightbox-actual-scroller"
-          style={{ right: inspectorOpen ? 276 : 0 }}
+          style={{ right: inspectorOpen && viewport.width > 768 ? 316 : 0 }}
           onClick={(e) => {
             if (e.target === e.currentTarget) onRequestClose();
           }}
@@ -854,7 +855,7 @@ export function QuickLookLightbox({
           type="button"
           className="lightbox-nav-btn lightbox-nav-btn--next"
           data-testid="lightbox-next-btn"
-          style={{ right: inspectorOpen ? 292 : 16 }}
+          style={{ right: inspectorOpen && viewport.width > 768 ? 332 : 16 }}
           initial={{ opacity: 0, x: 6 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.2, delay: 0.08 }}
@@ -865,112 +866,33 @@ export function QuickLookLightbox({
         </motion.button>
       )}
 
-      {/* Collapsible Right Inspector Drawer */}
+      {/* Collapsible Right Inspector Drawer (Info + Similar Masonry Capsule) */}
       <AnimatePresence>
         {inspectorOpen && !isReturning && (
-          <motion.aside
-            className="lightbox-inspector lightbox-inspector--floating"
-            data-testid="lightbox-inspector"
-            initial={{ opacity: 0, x: 28 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 28 }}
-            transition={{ type: "spring", stiffness: 400, damping: 36 }}
-          >
-            <div>
-              <div className="inspector-label">{m.qlInspectorTitle}</div>
-              <div style={{ fontSize: 13.5, fontWeight: 600 }}>{item.title}</div>
-            </div>
-
-            <div>
-              <div className="inspector-label">{m.qlInspectorPalette}</div>
-              <div className="palette-row">
-                {item.palette.map((hex) => (
-                  <button
-                    key={hex}
-                    type="button"
-                    className="palette-swatch"
-                    style={{ background: hex }}
-                    title={hex}
-                    aria-label={hex}
-                    onClick={() => {
-                      navigator.clipboard?.writeText(hex).catch(() => {});
-                      onNotify(hex);
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="inspector-label">{m.qlInspectorCollection}</div>
-              <select
-                className="inspector-tag-input"
-                style={{ marginTop: 0 }}
-                value={item.collectionId ?? ""}
-                onChange={(e) =>
-                  onUpdateCollection(
-                    item.id,
-                    e.target.value ? e.target.value : null,
-                  )
-                }
-              >
-                <option value="">{m.qlInspectorInboxUnsorted}</option>
-                {collections.map((col) => (
-                  <option key={col.id} value={col.id}>
-                    {col.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <div className="inspector-label">{m.qlInspectorTags}</div>
-              <div className="inspector-tags">
-                {item.tags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="inspector-tag-btn"
-                    onClick={() => onRemoveTagFromItem(item.id, tag)}
-                  >
-                    #{tag} ×
-                  </button>
-                ))}
-              </div>
-              <form onSubmit={handleTagFormSubmit}>
-                <input
-                  type="text"
-                  className="inspector-tag-input"
-                  placeholder={m.qlInspectorAddTagPlaceholder}
-                  value={newTagInput}
-                  onChange={(e) => setNewTagInput(e.target.value)}
-                />
-              </form>
-            </div>
-
-            <div>
-              <div className="inspector-label">{m.qlInspectorNotes}</div>
-              <textarea
-                className="inspector-tag-input"
-                style={{
-                  height: 82,
-                  padding: "8px 10px",
-                  marginTop: 0,
-                  resize: "vertical",
-                }}
-                value={item.note}
-                placeholder={m.qlInspectorNotesPlaceholder}
-                onChange={(e) => onUpdateNote(item.id, e.target.value)}
-              />
-            </div>
-          </motion.aside>
+          <QuickLookInspectorPanel
+            item={item}
+            allItems={allItems ?? items}
+            collections={collections}
+            theme={theme}
+            locale={locale}
+            onUpdateTitle={(id, title) => onUpdateTitle?.(id, title)}
+            onUpdateCollection={onUpdateCollection}
+            onAddTagToItem={onAddTagToItem}
+            onRemoveTagFromItem={onRemoveTagFromItem}
+            onUpdateNote={onUpdateNote}
+            onSelectSimilar={(targetId) => navigateWithDirection(targetId, 1)}
+            onCloseMobile={() => setInspectorOpen(false)}
+            onNotify={onNotify}
+          />
         )}
       </AnimatePresence>
 
       {/* Bottom-Right Index / Auto / Copy / Export Frosted Pill */}
       <motion.div
         className="lightbox-bottom-dock"
-        style={{ right: inspectorOpen && !isReturning ? 296 : 20 }}
+        style={{
+          right: inspectorOpen && !isReturning && viewport.width > 768 ? 336 : 20,
+        }}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: isReturning ? 0 : 1, y: isReturning ? 6 : 0 }}
         transition={{

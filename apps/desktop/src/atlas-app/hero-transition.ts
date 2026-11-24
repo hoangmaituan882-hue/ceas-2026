@@ -127,14 +127,18 @@ export function computeLightboxTargetRect(
   naturalHeight: number,
   inspectorOpen: boolean,
 ): ScreenRect {
-  const topInset = 64;
-  const bottomInset = 68;
-  const sideInset = 64;
-  const inspectorWidth = inspectorOpen ? 276 : 0;
+  const isMobile = viewportWidth <= 768;
+  const topInset = isMobile ? 58 : 64;
+  const bottomInset =
+    inspectorOpen && isMobile
+      ? Math.min(Math.round(viewportHeight * 0.56) + 16, 496)
+      : 68;
+  const sideInset = isMobile ? 20 : 64;
+  const inspectorWidth = inspectorOpen && !isMobile ? 316 : 0;
 
   const stageWidth = Math.max(220, viewportWidth - inspectorWidth);
   const availWidth = Math.max(180, stageWidth - sideInset * 2);
-  const availHeight = Math.max(180, viewportHeight - topInset - bottomInset);
+  const availHeight = Math.max(150, viewportHeight - topInset - bottomInset);
 
   const safeW = naturalWidth > 0 ? naturalWidth : 1200;
   const safeH = naturalHeight > 0 ? naturalHeight : 900;

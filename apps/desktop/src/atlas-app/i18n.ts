@@ -299,6 +299,12 @@ export interface AtlasMessages {
   qlLink: string;
   qlAuto: string;
   qlInspectorTitle: string;
+  qlInspectorTabInfo: string;
+  qlInspectorTabSimilar: string;
+  qlInspectorSimilarHeading: (title: string) => string;
+  qlInspectorSimilarEmpty: string;
+  qlInspectorSmartTitleTooltip: string;
+  qlInspectorSmartTitleToast: (title: string) => string;
   qlInspectorPalette: string;
   qlInspectorCollection: string;
   qlInspectorInboxUnsorted: string;
@@ -739,6 +745,12 @@ const EN_MESSAGES: AtlasMessages = {
   qlLink: "Link",
   qlAuto: "Auto",
   qlInspectorTitle: "Title",
+  qlInspectorTabInfo: "Info",
+  qlInspectorTabSimilar: "Similar",
+  qlInspectorSimilarHeading: (title) => `Items like “${title}”`,
+  qlInspectorSimilarEmpty: "Add more items to discover visual matches.",
+  qlInspectorSmartTitleTooltip: "Suggest refined title",
+  qlInspectorSmartTitleToast: (title) => `Updated title to “${title}”`,
   qlInspectorPalette: "Palette",
   qlInspectorCollection: "Collection",
   qlInspectorInboxUnsorted: "Inbox (Unsorted)",
@@ -1172,6 +1184,12 @@ const ZH_MESSAGES: AtlasMessages = {
   qlLink: "链接",
   qlAuto: "适应",
   qlInspectorTitle: "标题",
+  qlInspectorTabInfo: "信息",
+  qlInspectorTabSimilar: "类似",
+  qlInspectorSimilarHeading: (title) => `“${title}”等物品`,
+  qlInspectorSimilarEmpty: "导入更多素材即可发现视觉相似灵感。",
+  qlInspectorSmartTitleTooltip: "智能润色标题",
+  qlInspectorSmartTitleToast: (title) => `已更新标题为「${title}」`,
   qlInspectorPalette: "主色板",
   qlInspectorCollection: "所属合集",
   qlInspectorInboxUnsorted: "收件箱（未归档）",

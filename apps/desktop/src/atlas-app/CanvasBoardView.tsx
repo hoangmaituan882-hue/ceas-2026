@@ -1188,6 +1188,11 @@ export function CanvasBoardView({
     setDragSession((prev) => (prev && prev.id === sessionId ? null : prev));
   }, []);
 
+  const overlayHiddenIds = useMemo(() => {
+    if (!dragSession) return new Set<string>();
+    return new Set(dragSession.items.map((it) => it.id));
+  }, [dragSession]);
+
   if (items.length === 0) {
     return (
       <div className="atlas-empty">
@@ -1206,10 +1211,6 @@ export function CanvasBoardView({
       1000,
   );
   const isHeroSession = heroPush.heroKey !== null;
-  const overlayHiddenIds = useMemo(() => {
-    if (!dragSession) return new Set<string>();
-    return new Set(dragSession.items.map((it) => it.id));
-  }, [dragSession]);
 
   const isHandCursor = spacePressed || toolMode === "pan";
 
@@ -1549,12 +1550,10 @@ export function CanvasBoardView({
         onPackBoard={onTidyCanvas}
         onAddNote={handleAddNote}
         onToggleCommentComposer={() => {
-          setCommentComposerOpen((open) => {
-            const next = !open;
-            setToolMode(next ? "comment" : "select");
-            if (!next) setPendingCommentPoint(null);
-            return next;
-          });
+          const next = !commentComposerOpen;
+          setCommentComposerOpen(next);
+          setToolMode(next ? "comment" : "select");
+          if (!next) setPendingCommentPoint(null);
         }}
         onSubmitQuickComment={handleSubmitQuickComment}
         onToggleFind={() => setFindOpen((v) => !v)}
